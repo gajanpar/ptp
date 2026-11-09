@@ -66,6 +66,8 @@ $serverlessEnv = [
     'APP_SERVICES_CACHE' => '/tmp/services.php',
     'APP_PACKAGES_CACHE' => '/tmp/packages.php',
     'APP_EVENTS_CACHE' => '/tmp/events.php',
+    'SCRIPT_NAME' => '/index.php',
+    'PHP_SELF' => '/index.php',
 ];
 
 foreach ($serverlessEnv as $key => $val) {
