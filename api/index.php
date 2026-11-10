@@ -47,18 +47,35 @@ if (!file_exists($targetDb) || filesize($targetDb) === 0) {
 }
 
 // 3. Set environment variables for serverless execution across putenv, $_ENV, and $_SERVER
+$useSupabasePostgres = extension_loaded('pdo_pgsql') && (getenv('DB_CONNECTION') !== 'sqlite');
+
+$resolvedDbConnection = $useSupabasePostgres ? 'pgsql' : 'sqlite';
+$resolvedDbHost = getenv('DB_HOST') ?: 'aws-0-ap-northeast-1.pooler.supabase.com';
+$resolvedDbPort = getenv('DB_PORT') ?: '5432';
+$resolvedDbDatabase = $useSupabasePostgres ? (getenv('DB_DATABASE') ?: 'postgres') : $targetDb;
+$resolvedDbUsername = getenv('DB_USERNAME') ?: 'spktad_app.fqewatvykleqxnwmmiff';
+$resolvedDbPassword = getenv('DB_PASSWORD') ?: 'Spktad_Pelindo_Cirebon_2026!Secure';
+
 $serverlessEnv = [
     'VERCEL' => '1',
     'APP_NAME' => 'SPKTAD Pelindo Cirebon',
     'APP_ENV' => 'production',
     'APP_DEBUG' => 'false',
-    'APP_KEY' => getenv('APP_KEY') ?: 'base64:8qV7p9K2mX4nL6rT1wY3zB5vC8dF0gH2jK4lM6nP8qR=',
+    'APP_KEY' => getenv('APP_KEY') ?: 'base64:fA3eoib3fK3pvs6TACojMNSSwg2TWvuJ892sQ3KuSCQ=',
     'APP_TIMEZONE' => 'Asia/Jakarta',
     'APP_LOCALE' => 'id',
-    'DB_CONNECTION' => 'sqlite',
-    'DB_DATABASE' => $targetDb,
+    'DB_CONNECTION' => $resolvedDbConnection,
+    'DB_HOST' => $resolvedDbHost,
+    'DB_PORT' => $resolvedDbPort,
+    'DB_DATABASE' => $resolvedDbDatabase,
+    'DB_USERNAME' => $resolvedDbUsername,
+    'DB_PASSWORD' => $resolvedDbPassword,
+    'DB_SSLMODE' => getenv('DB_SSLMODE') ?: 'require',
+    'SUPABASE_PROJECT_REF' => 'fqewatvykleqxnwmmiff',
+    'SUPABASE_URL' => getenv('SUPABASE_URL') ?: 'https://fqewatvykleqxnwmmiff.supabase.co',
     'VIEW_COMPILED_PATH' => '/tmp/views',
     'SESSION_DRIVER' => 'cookie',
+    'SESSION_ENCRYPT' => 'true',
     'CACHE_STORE' => 'array',
     'LOG_CHANNEL' => 'stderr',
     'APP_CONFIG_CACHE' => '/tmp/config.php',
