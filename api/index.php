@@ -30,39 +30,37 @@ foreach ($tmpDirs as $dir) {
     }
 }
 
-// 2. Resolve database connection mode
-$useSupabasePostgres = extension_loaded('pdo_pgsql') && (getenv('DB_CONNECTION') !== 'sqlite');
+// 2. Prepare writable SQLite database
+$sourceDb = __DIR__.'/../database/database.sqlite';
 $targetDb = '/tmp/database.sqlite';
 $needsSeed = false;
 
-// Prepare writable SQLite database only when SQLite fallback is active
-if (! $useSupabasePostgres) {
-    $sourceDb = __DIR__.'/../database/database.sqlite';
-
-    if (! file_exists($targetDb) || filesize($targetDb) === 0) {
-        if (file_exists($sourceDb) && filesize($sourceDb) > 0) {
-            @copy($sourceDb, $targetDb);
-        } else {
-            @touch($targetDb);
-            $needsSeed = true;
-        }
-        @chmod($targetDb, 0666);
+if (! file_exists($targetDb) || filesize($targetDb) === 0) {
+    if (file_exists($sourceDb) && filesize($sourceDb) > 0) {
+        @copy($sourceDb, $targetDb);
+    } else {
+        @touch($targetDb);
+        $needsSeed = true;
     }
+    @chmod($targetDb, 0666);
 }
 
 // 3. Set environment variables for serverless execution across putenv, $_ENV, and $_SERVER
+$useSupabasePostgres = extension_loaded('pdo_pgsql') && (getenv('DB_CONNECTION') !== 'sqlite');
+
 $resolvedDbConnection = $useSupabasePostgres ? 'pgsql' : 'sqlite';
-$resolvedDbHost = getenv('DB_HOST') ?: (getenv('POSTGRES_HOST') ?: '127.0.0.1');
+$resolvedDbHost = getenv('DB_HOST') ?: (getenv('POSTGRES_HOST') ?: 'aws-0-ap-northeast-1.pooler.supabase.com');
 $resolvedDbPort = getenv('DB_PORT') ?: '5432';
 $resolvedDbDatabase = $useSupabasePostgres ? (getenv('DB_DATABASE') ?: (getenv('POSTGRES_DATABASE') ?: 'postgres')) : $targetDb;
-$resolvedDbUsername = getenv('DB_USERNAME') ?: (getenv('POSTGRES_USER') ?: '');
-$resolvedDbPassword = getenv('DB_PASSWORD') ?: (getenv('POSTGRES_PASSWORD') ?: '');
+$resolvedDbUsername = getenv('DB_USERNAME') ?: (getenv('POSTGRES_USER') ?: 'spktad_app.fqewatvykleqxnwmmiff');
+$resolvedDbPassword = getenv('DB_PASSWORD') ?: (getenv('POSTGRES_PASSWORD') ?: 'Spktad_Pelindo_Cirebon_2026!Secure');
 
 $serverlessEnv = [
     'VERCEL' => '1',
     'APP_NAME' => getenv('APP_NAME') ?: 'SPKTAD Pelindo Cirebon',
     'APP_ENV' => getenv('APP_ENV') ?: 'production',
     'APP_DEBUG' => getenv('APP_DEBUG') ?: 'false',
+    'APP_KEY' => getenv('APP_KEY') ?: 'base64:fA3eoib3fK3pvs6TACojMNSSwg2TWvuJ892sQ3KuSCQ=',
     'APP_TIMEZONE' => 'Asia/Jakarta',
     'APP_LOCALE' => 'id',
     'DB_CONNECTION' => $resolvedDbConnection,
@@ -72,11 +70,18 @@ $serverlessEnv = [
     'DB_USERNAME' => $resolvedDbUsername,
     'DB_PASSWORD' => $resolvedDbPassword,
     'DB_SSLMODE' => getenv('DB_SSLMODE') ?: 'require',
+    'SUPABASE_PROJECT_REF' => 'fqewatvykleqxnwmmiff',
+    'SUPABASE_URL' => getenv('SUPABASE_URL') ?: 'https://fqewatvykleqxnwmmiff.supabase.co',
     'VIEW_COMPILED_PATH' => '/tmp/views',
     'SESSION_DRIVER' => getenv('SESSION_DRIVER') ?: 'cookie',
     'SESSION_ENCRYPT' => 'true',
     'CACHE_STORE' => getenv('CACHE_STORE') ?: 'array',
     'LOG_CHANNEL' => 'stderr',
+    'APP_CONFIG_CACHE' => '/tmp/config.php',
+    'APP_ROUTES_CACHE' => '/tmp/routes.php',
+    'APP_SERVICES_CACHE' => '/tmp/services.php',
+    'APP_PACKAGES_CACHE' => '/tmp/packages.php',
+    'APP_EVENTS_CACHE' => '/tmp/events.php',
     'SCRIPT_NAME' => '/index.php',
     'PHP_SELF' => '/index.php',
 ];
