@@ -5,7 +5,6 @@ services:
     plan: free
     region: singapore
     branch: main
-    rootDir: .vscode/ptp
     dockerfilePath: Dockerfile
     dockerContext: .
     healthCheckPath: /up

@@ -198,7 +198,8 @@
 
     @if($totalEvaluated === 0)
         <div style="padding: 24px; text-align: center; color: #64748B; font-size: 13px;">
-            Belum ada nilai evaluasi yang tersimpan untuk divisi Anda pada bulan {{ $monthName }} {{ $year }}.
+            <div style="font-weight: 700; color: #0F172A; margin-bottom: 4px;">Belum Ada Evaluasi Selesai</div>
+            <div>Belum ada nilai evaluasi yang tersimpan untuk divisi Anda pada bulan {{ $monthName }} {{ $year }}.</div>
         </div>
     @else
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px 24px;">
@@ -409,7 +410,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #CBD5E1;">
                 <span>Status Kunci: <strong style="color: #FFFFFF;">{{ $periodStatus === 'closed' ? 'Terkunci' : 'Aktif / Terbuka' }}</strong></span>
                 @if($periodStatus === 'closed')
-                    <a href="{{ route('requests.index') }}" style="color: #38BDF8; font-weight: 600; text-decoration: none;">Ajukan Buka &rarr;</a>
+                    <a href="{{ route('penilaian.index', ['month' => $month, 'year' => $year]) }}" style="color: #38BDF8; font-weight: 600; text-decoration: none;">Ajukan Buka &rarr;</a>
                 @endif
             </div>
         </div>

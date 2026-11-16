@@ -21,14 +21,13 @@ class ReportController extends Controller
     {
         $periodType = $request->get('period_type', 'monthly');
         $year = (int) $request->get('year', 2026);
-        $month = (int) $request->get('month', 4); // Default to April 2026 with seeded appraisals
+        $month = (int) $request->get('month', 4);
+        if ($month < 1 || $month > 12) {
+            $month = 4;
+        }
         $divisionId = (string) $request->get('division_id', 'all');
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         $divisions = Division::where('is_active', true)->orderBy('id')->get();
         $selectedDivision = $divisionId !== 'all' ? Division::find((int) $divisionId) : null;
@@ -41,9 +40,9 @@ class ReportController extends Controller
     }
 
     /**
-     * Show single evaluation detail modal/breakdown with all 17 AKHLAK indicators.
+     * Show single evaluation detail breakdown with all 17 AKHLAK indicators.
      */
-    public function show(int $id)
+    public function show($id)
     {
         $evaluation = Evaluation::with([
             'employee.division',
@@ -51,18 +50,7 @@ class ReportController extends Controller
             'details.subcategory.category',
         ])->findOrFail($id);
 
-        $groupedDetails = [];
-        foreach ($evaluation->details as $detail) {
-            $cat = $detail->subcategory->category;
-            $catId = $cat->id;
-            if (! isset($groupedDetails[$catId])) {
-                $groupedDetails[$catId] = [
-                    'category' => $cat,
-                    'items' => [],
-                ];
-            }
-            $groupedDetails[$catId]['items'][] = $detail;
-        }
+        $groupedDetails = EvaluationScoringService::groupDetailsByCategory($evaluation->details);
 
         if (request()->wantsJson()) {
             return response()->json([
@@ -81,30 +69,22 @@ class ReportController extends Controller
     /**
      * Print official individual evaluation form with Pelindo Cirebon letterhead.
      */
-    public function printSingle(int $id): View
+    public function printSingle(Request $request, $id): View
     {
+        $action = in_array($request->get('action'), ['print', 'save_pdf'], true)
+            ? $request->get('action')
+            : 'print';
+
         $evaluation = Evaluation::with([
             'employee.division',
             'evaluator',
             'details.subcategory.category',
         ])->findOrFail($id);
 
-        $groupedDetails = [];
-        foreach ($evaluation->details as $detail) {
-            $cat = $detail->subcategory->category;
-            $catId = $cat->id;
-            if (! isset($groupedDetails[$catId])) {
-                $groupedDetails[$catId] = [
-                    'category' => $cat,
-                    'items' => [],
-                ];
-            }
-            $groupedDetails[$catId]['items'][] = $detail;
-        }
-
         return view('admin.reports.print_single', [
             'evaluation' => $evaluation,
-            'groupedDetails' => $groupedDetails,
+            'groupedDetails' => EvaluationScoringService::groupDetailsByCategory($evaluation->details),
+            'action' => $action,
         ]);
     }
 
@@ -116,13 +96,15 @@ class ReportController extends Controller
         $periodType = $request->get('period_type', 'monthly');
         $year = (int) $request->get('year', 2026);
         $month = (int) $request->get('month', 4);
+        if ($month < 1 || $month > 12) {
+            $month = 4;
+        }
         $divisionId = (string) $request->get('division_id', 'all');
+        $action = in_array($request->get('action'), ['print', 'save_pdf'], true)
+            ? $request->get('action')
+            : 'print';
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         $division = $divisionId !== 'all' ? Division::find((int) $divisionId) : null;
 
@@ -134,6 +116,7 @@ class ReportController extends Controller
                 'division' => $division,
                 'annualData' => $annualData,
                 'monthNames' => $monthNames,
+                'action' => $action,
             ]);
         }
 
@@ -156,6 +139,7 @@ class ReportController extends Controller
             'division' => $division,
             'evaluations' => $evaluations,
             'metrics' => $metrics,
+            'action' => $action,
         ]);
     }
 
@@ -168,20 +152,205 @@ class ReportController extends Controller
         $periodType = $request->get('period_type', 'monthly');
         $year = (int) $request->get('year', 2026);
         $month = (int) $request->get('month', 4);
+        if ($month < 1 || $month > 12) {
+            $month = 4;
+        }
         $divisionId = (string) $request->get('division_id', 'all');
+        $format = strtolower((string) $request->get('format', 'csv'));
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        $monthName = EvaluationScoringService::getMonthName($month);
+        $subcategories = EvaluationSubcategory::with('category')->orderBy('order_index')->get();
+
+        $baseFilename = ($periodType === 'annual')
+            ? "Laporan_Tahunan_Kinerja_TAD_Pelindo_Cirebon_{$year}"
+            : "Laporan_Bulanan_Kinerja_TAD_Pelindo_Cirebon_{$monthName}_{$year}";
+
+        if ($format === 'excel') {
+            return $this->streamExcelExport($baseFilename, $periodType, $month, $year, $divisionId, $subcategories);
+        }
+
+        return $this->streamCsvExport($baseFilename, $periodType, $month, $year, $divisionId, $subcategories);
+    }
+
+    /**
+     * Sanitize spreadsheet cell text against CSV/Excel Formula Injection (CWE-1236).
+     */
+    private function sanitizeSpreadsheetCell(mixed $value): mixed
+    {
+        if (is_numeric($value) || $value === null) {
+            return $value;
+        }
+
+        $str = (string) $value;
+        if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
+            return "'".$str;
+        }
+
+        return $str;
+    }
+
+    /**
+     * Load monthly evaluations filtered cleanly by division for export streams.
+     */
+    private function getMonthlyEvaluationsForExport(int $month, int $year, string $divisionId)
+    {
+        $query = Evaluation::with([
+            'employee.division',
+            'evaluator',
+            'details',
+        ])
+            ->where('period_month', $month)
+            ->where('period_year', $year);
+
+        if ($divisionId !== 'all') {
+            $query->where('division_id', (int) $divisionId);
+        }
+
+        return $query->orderByDesc('total_score')->get();
+    }
+
+    /**
+     * Stream Excel-compatible HTML spreadsheet with corporate Pelindo styles.
+     */
+    private function streamExcelExport(
+        string $baseFilename,
+        string $periodType,
+        int $month,
+        int $year,
+        string $divisionId,
+        $subcategories
+    ): StreamedResponse {
+        $filename = "{$baseFilename}.xls";
+        $headers = [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
         ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
-        $subcategories = EvaluationSubcategory::orderBy('order_index')->get();
+        return response()->stream(function () use ($periodType, $month, $year, $divisionId, $monthNames, $subcategories): void {
+            $out = fopen('php://output', 'w');
 
-        $filename = ($periodType === 'annual')
-            ? "Laporan_Tahunan_Kinerja_TAD_Pelindo_Cirebon_{$year}.csv"
-            : "Laporan_Bulanan_Kinerja_TAD_Pelindo_Cirebon_{$monthNames[$month]}_{$year}.csv";
+            fwrite($out, '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">'."\n");
+            fwrite($out, '<head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'."\n");
+            fwrite($out, "<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Laporan Kinerja TAD</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->\n");
+            fwrite($out, '<style>
+                body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #0f172a; }
+                table { border-collapse: collapse; width: 100%; }
+                th { background-color: #00223B; color: #FFFFFF; font-weight: bold; border: 1px solid #CBD5E1; padding: 7px 10px; text-align: center; }
+                td { border: 1px solid #CBD5E1; padding: 6px 8px; vertical-align: middle; }
+                .title { font-size: 13pt; font-weight: bold; color: #00223B; }
+                .subtitle { font-size: 11pt; font-weight: bold; color: #0072CE; }
+                .meta { font-size: 9.5pt; color: #64748B; }
+                .num { mso-number-format: "0\.00"; text-align: right; }
+                .str { mso-number-format: "\@"; }
+                .str-center { mso-number-format: "\@"; text-align: center; }
+                .center { text-align: center; }
+                .right { text-align: right; }
+            </style>'."\n");
+            fwrite($out, '</head><body>'."\n<table>\n");
 
+            if ($periodType === 'annual') {
+                $annualData = $this->computeAnnualData($year, $divisionId);
+
+                fwrite($out, '<tr><td colspan="18" class="title">PT PELABUHAN INDONESIA (PERSERO) - BRANCH CIREBON</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="18" class="subtitle">SISTEM PENILAIAN KINERJA TENAGA ALIH DAYA (SPKTAD)</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="18" class="meta">REKAPITULASI PENILAIAN TAHUNAN - TAHUN '.htmlspecialchars((string) $year).'</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="18" class="meta">Tanggal Unduh: '.now()->translatedFormat('d F Y H:i').' WIB</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="18"></td></tr>'."\n<tr>");
+                fwrite($out, '<th>No</th><th>NIK</th><th>Nama Karyawan TAD</th><th>Divisi Penempatan</th><th>Jabatan / Posisi</th><th>Mitra Vendor</th>');
+                for ($m = 1; $m <= 12; $m++) {
+                    fwrite($out, '<th>'.substr($monthNames[$m], 0, 3).'</th>');
+                }
+                fwrite($out, '<th>Bulan Dinilai</th><th>Total Akumulasi</th><th>Rata-Rata Tahunan</th><th>Predikat Akhir</th>'."</tr>\n");
+
+                foreach ($annualData['rows'] as $idx => $row) {
+                    $emp = $row['employee'];
+                    fwrite($out, '<tr>');
+                    fwrite($out, '<td class="center">'.($idx + 1).'</td>');
+                    fwrite($out, '<td class="str-center">'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->nik ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->name ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->division?->name ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->position ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->vendor_name ?? '-')).'</td>');
+
+                    for ($m = 1; $m <= 12; $m++) {
+                        fwrite($out, isset($row['monthly_scores'][$m])
+                            ? '<td class="num">'.number_format($row['monthly_scores'][$m], 2, '.', '').'</td>'
+                            : '<td class="center">-</td>');
+                    }
+
+                    fwrite($out, '<td class="center">'.htmlspecialchars("{$row['evaluated_count']}/12").'</td>');
+                    fwrite($out, '<td class="num">'.number_format($row['total_score_sum'], 2, '.', '').'</td>');
+                    fwrite($out, '<td class="num">'.number_format($row['annual_average'], 2, '.', '').'</td>');
+                    fwrite($out, '<td class="center">'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($row['predicate'])).'</td>');
+                    fwrite($out, "</tr>\n");
+                }
+            } else {
+                $evaluations = $this->getMonthlyEvaluationsForExport($month, $year, $divisionId);
+                $colspan = 11 + $subcategories->count();
+
+                fwrite($out, '<tr><td colspan="'.$colspan.'" class="title">PT PELABUHAN INDONESIA (PERSERO) - BRANCH CIREBON</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="'.$colspan.'" class="subtitle">SISTEM PENILAIAN KINERJA TENAGA ALIH DAYA (SPKTAD)</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="'.$colspan.'" class="meta">REKAPITULASI PENILAIAN BULANAN - '.htmlspecialchars("{$monthNames[$month]} {$year}").'</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="'.$colspan.'" class="meta">Tanggal Unduh: '.now()->translatedFormat('d F Y H:i').' WIB</td></tr>'."\n");
+                fwrite($out, '<tr><td colspan="'.$colspan.'"></td></tr>'."\n<tr>");
+                fwrite($out, '<th>No</th><th>NIK</th><th>Nama Karyawan TAD</th><th>Divisi Penempatan</th><th>Jabatan</th><th>Mitra Vendor</th>');
+                foreach ($subcategories as $sub) {
+                    $catName = $sub->category?->name ?? 'Kategori';
+                    fwrite($out, '<th>'.htmlspecialchars("Item #{$sub->order_index} ({$catName})").'</th>');
+                }
+                fwrite($out, '<th>Total Skor (0-100)</th><th>Rata-Rata Rating</th><th>Predikat Kinerja</th><th>Pejabat Penilai</th><th>Tanggal Evaluasi</th>'."</tr>\n");
+
+                foreach ($evaluations as $idx => $eval) {
+                    $detailMap = $eval->details->keyBy('subcategory_id');
+                    $emp = $eval->employee;
+
+                    fwrite($out, '<tr>');
+                    fwrite($out, '<td class="center">'.($idx + 1).'</td>');
+                    fwrite($out, '<td class="str-center">'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->nik ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->name ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->division?->name ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->position ?? '-')).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($emp?->vendor_name ?? '-')).'</td>');
+
+                    foreach ($subcategories as $sub) {
+                        if (isset($detailMap[$sub->id])) {
+                            $valStr = number_format($detailMap[$sub->id]->score, 2)." (R{$detailMap[$sub->id]->rating})";
+                            fwrite($out, '<td class="center">'.htmlspecialchars($valStr).'</td>');
+                        } else {
+                            fwrite($out, '<td class="center">-</td>');
+                        }
+                    }
+
+                    fwrite($out, '<td class="num">'.number_format($eval->total_score, 2, '.', '').'</td>');
+                    fwrite($out, '<td class="num">'.number_format($eval->average_score, 2, '.', '').'</td>');
+                    fwrite($out, '<td class="center">'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($eval->predicate)).'</td>');
+                    fwrite($out, '<td>'.htmlspecialchars((string) $this->sanitizeSpreadsheetCell($eval->evaluator?->name ?? '-')).'</td>');
+                    fwrite($out, '<td class="center">'.htmlspecialchars($eval->submitted_at ? $eval->submitted_at->format('d/m/Y H:i') : '-').'</td>');
+                    fwrite($out, "</tr>\n");
+                }
+            }
+
+            fwrite($out, "</table>\n</body></html>\n");
+            fclose($out);
+        }, 200, $headers);
+    }
+
+    /**
+     * Stream UTF-8 BOM CSV spreadsheet export.
+     */
+    private function streamCsvExport(
+        string $baseFilename,
+        string $periodType,
+        int $month,
+        int $year,
+        string $divisionId,
+        $subcategories
+    ): StreamedResponse {
+        $filename = "{$baseFilename}.csv";
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"{$filename}\"",
@@ -189,36 +358,19 @@ class ReportController extends Controller
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
         ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         return response()->stream(function () use ($periodType, $month, $year, $divisionId, $monthNames, $subcategories): void {
             $handle = fopen('php://output', 'w');
 
-            // Defensive security: Sanitize CSV values to prevent CSV Formula Injection (CWE-1236)
-            $sanitizeCell = function ($val) {
-                if (is_numeric($val) || $val === null) {
-                    return $val;
-                }
-                $str = (string) $val;
-                if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true)) {
-                    return "'".$str;
-                }
-
-                return $str;
-            };
-
-            // Write UTF-8 BOM so Microsoft Excel correctly reads special characters
             fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-
-            // Formal Header metadata
             fputcsv($handle, ['PT PELABUHAN INDONESIA (PERSERO) - BRANCH CIREBON']);
             fputcsv($handle, ['SISTEM PENILAIAN KINERJA TENAGA ALIH DAYA (SPKTAD)']);
-            if ($periodType === 'annual') {
-                fputcsv($handle, ["REKAPITULASI PENILAIAN TAHUNAN - TAHUN {$year}"]);
-            } else {
-                fputcsv($handle, ["REKAPITULASI PENILAIAN BULANAN - {$monthNames[$month]} {$year}"]);
-            }
+            fputcsv($handle, [$periodType === 'annual'
+                ? "REKAPITULASI PENILAIAN TAHUNAN - TAHUN {$year}"
+                : "REKAPITULASI PENILAIAN BULANAN - {$monthNames[$month]} {$year}"]);
             fputcsv($handle, ['Tanggal Unduh: '.now()->translatedFormat('d F Y H:i').' WIB']);
-            fputcsv($handle, []); // Empty separator line
+            fputcsv($handle, []);
 
             if ($periodType === 'annual') {
                 $annualData = $this->computeAnnualData($year, $divisionId);
@@ -227,21 +379,18 @@ class ReportController extends Controller
                 for ($m = 1; $m <= 12; $m++) {
                     $columns[] = substr($monthNames[$m], 0, 3);
                 }
-                $columns[] = 'Bulan Dinilai';
-                $columns[] = 'Total Akumulasi';
-                $columns[] = 'Rata-Rata Tahunan';
-                $columns[] = 'Predikat Akhir';
-
+                $columns = array_merge($columns, ['Bulan Dinilai', 'Total Akumulasi', 'Rata-Rata Tahunan', 'Predikat Akhir']);
                 fputcsv($handle, $columns);
 
                 foreach ($annualData['rows'] as $idx => $row) {
-                    $line = array_map($sanitizeCell, [
+                    $emp = $row['employee'];
+                    $line = array_map($this->sanitizeSpreadsheetCell(...), [
                         $idx + 1,
-                        $row['employee']->nik,
-                        $row['employee']->name,
-                        $row['employee']->division->name ?? '-',
-                        $row['employee']->position,
-                        $row['employee']->vendor_name,
+                        $emp?->nik ?? '-',
+                        $emp?->name ?? '-',
+                        $emp?->division?->name ?? '-',
+                        $emp?->position ?? '-',
+                        $emp?->vendor_name ?? '-',
                     ]);
 
                     for ($m = 1; $m <= 12; $m++) {
@@ -253,47 +402,32 @@ class ReportController extends Controller
                     $line[] = "{$row['evaluated_count']}/12";
                     $line[] = number_format($row['total_score_sum'], 2);
                     $line[] = number_format($row['annual_average'], 2);
-                    $line[] = $sanitizeCell($row['predicate']);
+                    $line[] = $this->sanitizeSpreadsheetCell($row['predicate']);
 
                     fputcsv($handle, $line);
                 }
             } else {
-                $query = Evaluation::with([
-                    'employee.division',
-                    'evaluator',
-                    'details.subcategory',
-                ])
-                    ->where('period_month', $month)
-                    ->where('period_year', $year);
-
-                if ($divisionId !== 'all') {
-                    $query->where('division_id', (int) $divisionId);
-                }
-
-                $evaluations = $query->orderByDesc('total_score')->get();
+                $evaluations = $this->getMonthlyEvaluationsForExport($month, $year, $divisionId);
 
                 $columns = ['No', 'NIK', 'Nama Karyawan TAD', 'Divisi Penempatan', 'Jabatan', 'Mitra Vendor'];
                 foreach ($subcategories as $sub) {
-                    $columns[] = "Item #{$sub->order_index} ({$sub->category->name})";
+                    $catName = $sub->category?->name ?? 'Kategori';
+                    $columns[] = "Item #{$sub->order_index} ({$catName})";
                 }
-                $columns[] = 'Total Skor (0-100)';
-                $columns[] = 'Rata-Rata Rating';
-                $columns[] = 'Predikat Kinerja';
-                $columns[] = 'Pejabat Penilai';
-                $columns[] = 'Tanggal Evaluasi';
-
+                $columns = array_merge($columns, ['Total Skor (0-100)', 'Rata-Rata Rating', 'Predikat Kinerja', 'Pejabat Penilai', 'Tanggal Evaluasi']);
                 fputcsv($handle, $columns);
 
                 foreach ($evaluations as $idx => $eval) {
                     $detailMap = $eval->details->keyBy('subcategory_id');
+                    $emp = $eval->employee;
 
-                    $line = array_map($sanitizeCell, [
+                    $line = array_map($this->sanitizeSpreadsheetCell(...), [
                         $idx + 1,
-                        $eval->employee->nik,
-                        $eval->employee->name,
-                        $eval->employee->division->name ?? '-',
-                        $eval->employee->position,
-                        $eval->employee->vendor_name,
+                        $emp?->nik ?? '-',
+                        $emp?->name ?? '-',
+                        $emp?->division?->name ?? '-',
+                        $emp?->position ?? '-',
+                        $emp?->vendor_name ?? '-',
                     ]);
 
                     foreach ($subcategories as $sub) {
@@ -304,8 +438,8 @@ class ReportController extends Controller
 
                     $line[] = number_format($eval->total_score, 2);
                     $line[] = number_format($eval->average_score, 2);
-                    $line[] = $sanitizeCell($eval->predicate);
-                    $line[] = $sanitizeCell($eval->evaluator->name ?? '-');
+                    $line[] = $this->sanitizeSpreadsheetCell($eval->predicate);
+                    $line[] = $this->sanitizeSpreadsheetCell($eval->evaluator?->name ?? '-');
                     $line[] = $eval->submitted_at ? $eval->submitted_at->format('d/m/Y H:i') : '-';
 
                     fputcsv($handle, $line);
@@ -339,19 +473,23 @@ class ReportController extends Controller
         $evaluations = $query->orderByDesc('total_score')->get();
         $metrics = $this->computeMonthlyMetrics($evaluations, $divisionId);
 
-        // Division comparison
+        // Division comparison — single grouped query to prevent N+1 (one query per division).
+        $allDivisionEvaluations = Evaluation::where('period_month', $month)
+            ->where('period_year', $year)
+            ->get(['division_id', 'total_score'])
+            ->groupBy('division_id');
+
         $divisionComparisons = [];
         foreach ($divisions as $div) {
-            $divEvals = Evaluation::where('division_id', $div->id)
-                ->where('period_month', $month)
-                ->where('period_year', $year)
-                ->get();
+            $divEvals = $allDivisionEvaluations->get($div->id, collect());
+            $count = $divEvals->count();
+            $avgScore = $count > 0 ? round($divEvals->avg('total_score'), 2) : 0.0;
 
             $divisionComparisons[] = [
                 'division' => $div,
-                'count' => $divEvals->count(),
-                'avg_score' => $divEvals->count() > 0 ? round($divEvals->avg('total_score'), 2) : 0.0,
-                'predicate' => $divEvals->count() > 0 ? EvaluationScoringService::getPredicate($divEvals->avg('total_score')) : 'Belum Ada',
+                'count' => $count,
+                'avg_score' => $avgScore,
+                'predicate' => $count > 0 ? EvaluationScoringService::getPredicate($avgScore) : 'Belum Ada',
             ];
         }
 

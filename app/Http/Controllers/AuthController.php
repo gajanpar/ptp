@@ -21,11 +21,6 @@ class AuthController extends Controller
                 : redirect()->route('dashboard');
         }
 
-        // Generate clean random captcha code in session if not exists
-        if (! session()->has('captcha_code')) {
-            session(['captcha_code' => $this->generateCaptchaCode()]);
-        }
-
         return view('auth.login');
     }
 

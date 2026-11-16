@@ -2,8 +2,20 @@
 
 namespace App\Services;
 
+use App\Models\EvaluationDetail;
+
 class EvaluationScoringService
 {
+    public const MONTH_NAMES = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
+
+    public const AKHLAK_PILLARS = [
+        'Amanah', 'Kompeten', 'Harmonis', 'Loyal', 'Adaptif', 'Kolaboratif',
+    ];
+
     public const RATING_SCORES = [
         1 => 0.98,
         2 => 1.96,
@@ -113,5 +125,71 @@ class EvaluationScoringService
             'predicate' => $predicate,
             'details' => $details,
         ];
+    }
+
+    public static function getMonthName(int $month): string
+    {
+        return self::MONTH_NAMES[$month] ?? '-';
+    }
+
+    /**
+     * Group evaluation detail rows by their parent AKHLAK category safely.
+     */
+    public static function groupDetailsByCategory(iterable $details): array
+    {
+        $grouped = [];
+
+        foreach ($details as $detail) {
+            $category = $detail->subcategory?->category;
+            if (! $category) {
+                continue;
+            }
+
+            $categoryId = $category->id;
+            if (! isset($grouped[$categoryId])) {
+                $grouped[$categoryId] = [
+                    'category' => $category,
+                    'items' => [],
+                ];
+            }
+
+            $grouped[$categoryId]['items'][] = $detail;
+        }
+
+        return $grouped;
+    }
+
+    /**
+     * Compute averaged scores across the 6 AKHLAK core pillars using a single grouped query.
+     *
+     * @param  iterable<int, int>  $evalIds
+     * @return array<string, array{name: string, raw_avg: float, score_100: float}>
+     */
+    public static function computeAkhlakStats(iterable $evalIds): array
+    {
+        $ids = collect($evalIds)->filter()->values();
+        $catAverages = collect();
+
+        if ($ids->isNotEmpty()) {
+            $catAverages = EvaluationDetail::whereIn('evaluation_details.evaluation_id', $ids)
+                ->join('evaluation_subcategories', 'evaluation_details.subcategory_id', '=', 'evaluation_subcategories.id')
+                ->join('evaluation_categories', 'evaluation_subcategories.category_id', '=', 'evaluation_categories.id')
+                ->selectRaw('evaluation_categories.name, AVG(evaluation_details.score) as avg_score')
+                ->groupBy('evaluation_categories.id', 'evaluation_categories.name', 'evaluation_categories.order_index')
+                ->orderBy('evaluation_categories.order_index')
+                ->pluck('avg_score', 'name');
+        }
+
+        $stats = [];
+        foreach (self::AKHLAK_PILLARS as $pillarName) {
+            $avgScore = $catAverages->get($pillarName);
+            $stats[$pillarName] = [
+                'name' => $pillarName,
+                'raw_avg' => $avgScore ? round((float) $avgScore, 2) : 0.0,
+                'score_100' => $avgScore ? round(((float) $avgScore / 5.88) * 100, 1) : 0.0,
+            ];
+        }
+
+        return $stats;
     }
 }

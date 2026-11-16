@@ -8,174 +8,15 @@
     <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}?v={{ @filemtime(public_path('assets/css/style.css')) ?: time() }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"></noscript>
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <style>
-        /* Admin Pelindo Corporate Layout */
-        .brand-logo-sidebar-admin {
-            padding: 20px 24px 16px 24px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            background: #001F35;
-        }
-        .brand-logo-sidebar-admin img {
-            max-width: 175px;
-            height: auto;
-            object-fit: contain;
-            margin-bottom: 10px;
-        }
-        .admin-badge-pill {
-            background: rgba(0, 163, 224, 0.15);
-            color: #38bdf8;
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            padding: 3px 12px;
-            border-radius: 999px;
-            font-size: 10.5px;
-            font-weight: 700;
-            letter-spacing: 0.6px;
-            text-transform: uppercase;
-        }
-        .user-topbar-profile {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        .admin-avatar-circle {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #005FA8, #0369a1);
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 16px;
-            box-shadow: 0 2px 6px rgba(0, 95, 168, 0.3);
-        }
-        .badge-counter {
-            background: #b91c1c;
-            color: #ffffff;
-            font-size: 10px;
-            font-weight: 800;
-            padding: 2px 7px;
-            border-radius: 999px;
-            margin-inline-start: auto;
-        }
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(10, 22, 40, 0.65);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-            z-index: 9999;
-            align-items: safe center;
-            justify-content: center;
-            padding: 16px;
-            overflow-y: auto;
-            box-sizing: border-box;
-        }
-        .modal-overlay.active {
-            display: flex;
-        }
-        .modal-box {
-            background: #ffffff;
-            border-radius: 12px;
-            width: 100%;
-            max-width: 540px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
-            overflow-y: auto;
-            max-height: min(90dvh, calc(100dvh - 32px));
-            text-align: start;
-            padding: 24px;
-            margin: auto;
-            box-sizing: border-box;
-        }
-        .modal-box input,
-        .modal-box select,
-        .modal-box textarea {
-            scroll-margin-bottom: 72px;
-        }
-        .modal-actions-sticky {
-            position: sticky;
-            bottom: 0 !important;
-            background: #ffffff;
-            padding-top: 14px;
-            padding-bottom: 8px;
-            border-top: 1px solid #e2e8f0;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            z-index: 10;
-            margin-top: 16px;
-            flex-wrap: wrap;
-        }
-        @media (max-width: 480px) {
-            .modal-box {
-                padding: 16px !important;
-            }
-            .modal-actions-sticky {
-                bottom: 0 !important;
-                flex-direction: column-reverse;
-                gap: 8px;
-                width: 100%;
-            }
-            .modal-actions-sticky > *,
-            .modal-actions-sticky form,
-            .modal-actions-sticky button,
-            .modal-actions-sticky a {
-                width: 100% !important;
-                box-sizing: border-box;
-                justify-content: center;
-                text-align: center;
-            }
-        }
-        @media (max-height: 520px) {
-            .modal-overlay {
-                padding: 8px;
-            }
-            .modal-box {
-                padding: 12px 16px !important;
-                margin: 8px auto;
-                max-height: calc(100dvh - 16px) !important;
-            }
-            .modal-actions-sticky {
-                margin-top: 10px;
-                padding-top: 8px;
-                padding-bottom: 6px;
-            }
-        }
-
-        /* Pelindo Anti-Giant Icon & Pagination Guard */
-        nav[role="navigation"] svg,
-        nav svg,
-        .pagination svg,
-        .w-5.h-5,
-        svg.w-5,
-        svg.h-5,
-        svg[viewBox="0 0 20 20"] {
-            width: 16px !important;
-            height: 16px !important;
-            min-width: 16px !important;
-            min-height: 16px !important;
-            max-width: 16px !important;
-            max-height: 16px !important;
-            display: inline-block !important;
-            vertical-align: middle !important;
-        }
-    </style>
 </head>
 <body>
+    <div id="topLoadingProgress" class="top-loading-bar" aria-hidden="true"></div>
     <a href="#main-content" class="skip-link">Lewati ke konten utama</a>
     @php
-        $pendingBadge = \App\Models\EditRequest::where('status', 'pending')->count();
+        $pendingBadge = $pendingBadge ?? $pendingRequestsCount ?? \App\Models\EditRequest::where('status', 'pending')->count();
     @endphp
 
     <div class="app-layout">
@@ -297,7 +138,7 @@
                             <div title="Super Administrator" tabindex="0" style="font-size: 11.5px; color: #0369a1; font-weight: 600;">Super Administrator</div>
                         </div>
                         <div class="admin-avatar-circle" aria-hidden="true">
-                            A
+                            {{ strtoupper(substr(Auth::user()->name ?? 'A', 0, 1)) }}
                         </div>
                     </a>
                 </div>
@@ -365,63 +206,7 @@
         </div>
     </dialog>
 
-    <script>
-        function toggleSidebar() {
-            const sidebar = document.querySelector('.sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            if (sidebar) sidebar.classList.toggle('open');
-            if (overlay) overlay.classList.toggle('active');
-            document.body.classList.toggle('sidebar-locked');
-        }
-
-        function openLogoutModal() {
-            const modal = document.getElementById('logoutModal');
-            if (modal && typeof modal.showModal === 'function') {
-                modal.showModal();
-            } else if (modal) {
-                modal.setAttribute('open', '');
-            }
-        }
-        function closeLogoutModal() {
-            const modal = document.getElementById('logoutModal');
-            if (modal && typeof modal.close === 'function' && modal.open) {
-                modal.close();
-            } else if (modal) {
-                modal.removeAttribute('open');
-            }
-        }
-        document.getElementById('logoutModal')?.addEventListener('click', function(e) {
-            if (e.target === this) {
-                const r = this.getBoundingClientRect();
-                if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
-                    closeLogoutModal();
-                }
-            }
-        });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                const sidebar = document.querySelector('.sidebar');
-                if (sidebar && sidebar.classList.contains('open')) {
-                    toggleSidebar();
-                }
-            }
-        });
-
-        // 24-Hour WIB Minute-Cadence Clock (No 1Hz ticking distraction)
-        (function() {
-            const clockEl = document.getElementById('serverClock');
-            if (!clockEl) return;
-            const parts = clockEl.innerText.replace(' WIB', '').split(':').map(Number);
-            if (parts.length < 2 || parts.some(isNaN)) return;
-            let [hours, minutes] = parts;
-            setInterval(() => {
-                minutes++;
-                if (minutes >= 60) { minutes = 0; hours++; }
-                if (hours >= 24) { hours = 0; }
-                clockEl.innerText = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')} WIB`;
-            }, 60000);
-        })();
-    </script>
+    <script src="{{ asset('assets/js/spktad-layout.js') }}?v={{ @filemtime(public_path('assets/js/spktad-layout.js')) ?: time() }}" defer></script>
     @stack('scripts')
 </body>
 </html>

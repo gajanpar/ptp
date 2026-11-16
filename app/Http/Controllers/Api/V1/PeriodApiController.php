@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\Employee;
 use App\Models\Evaluation;
 use App\Models\PeriodManagement;
+use App\Services\EvaluationScoringService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,9 @@ class PeriodApiController extends ApiController
         if ($month < 1 || $month > 12) {
             $month = (int) date('n');
         }
+        if ($year < 2020 || $year > 2100) {
+            $year = (int) date('Y');
+        }
 
         // Target division
         $divisionId = $user->role === 'admin'
@@ -31,7 +35,11 @@ class PeriodApiController extends ApiController
 
         // Cutoff time: 25th of evaluation month at 23:59:59 Asia/Jakarta
         $now = Carbon::now('Asia/Jakarta');
-        $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59, 'Asia/Jakarta');
+        try {
+            $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59, 'Asia/Jakarta');
+        } catch (\Throwable) {
+            $cutoffDate = Carbon::create((int) date('Y'), (int) date('n'), 25, 23, 59, 59, 'Asia/Jakarta');
+        }
 
         $isPastCutoff = $now->greaterThan($cutoffDate);
         $remainingSeconds = $isPastCutoff ? 0 : $now->diffInSeconds($cutoffDate, false);
@@ -66,18 +74,14 @@ class PeriodApiController extends ApiController
         $pendingTad = max(0, $totalTad - $evaluatedTad);
         $completionRate = $totalTad > 0 ? round(($evaluatedTad / $totalTad) * 100, 1) : 0.0;
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthLabel = EvaluationScoringService::getMonthName($month);
 
         return $this->jsonSuccess([
             'period' => [
                 'month' => $month,
                 'year' => $year,
-                'month_name' => $monthNames[$month] ?? '-',
-                'label' => ($monthNames[$month] ?? '-').' '.$year,
+                'month_name' => $monthLabel,
+                'label' => $monthLabel.' '.$year,
             ],
             'server_time' => $now->toIso8601String(),
             'cutoff' => [

@@ -5,14 +5,28 @@
 
 /* ─── CSS Variables (Unified Pelindo 60-30-10 Token System) ──── */
 :root {
-    --brand-navy: #00223B;
+    /* Standard Corporate Pelindo Color Palette */
+    --pelindo-blue-primary: #005b9f;
+    --pelindo-navy-deep: #00223b;
+    --pelindo-cyan-azure: #00a3e0;
+    --pelindo-slate-bg: #f8fafc;
+    --pelindo-surface: #ffffff;
+    --pelindo-border: #e2e8f0;
+
+    /* Backward-compatible brand aliases */
+    --brand-navy: var(--pelindo-navy-deep);
     --brand-navy-dark: #001728;
     --brand-navy-light: #0B2B47;
-    --brand-navy-surface: #00223B;
+    --brand-navy-surface: var(--pelindo-navy-deep);
 
-    --brand-accent: #005FA8;
-    --brand-accent-hover: #004B87;
+    --brand-accent: var(--pelindo-blue-primary);
+    --brand-accent-hover: #004b82;
     --brand-accent-subtle: #EBF5FF;
+
+    /* Navy ambient shadow tokens */
+    --shadow-pelindo-sm: 0 1px 2px rgba(0, 34, 59, 0.06);
+    --shadow-pelindo-md: 0 4px 6px -1px rgba(0, 34, 59, 0.08), 0 2px 4px -2px rgba(0, 34, 59, 0.05);
+    --shadow-pelindo-lg: 0 10px 15px -3px rgba(0, 34, 59, 0.10), 0 4px 6px -4px rgba(0, 34, 59, 0.06);
 
     --navy-900: var(--brand-navy-dark);
     --navy-800: var(--brand-navy);
@@ -2788,19 +2802,141 @@ select.form-input {
 
 .table-responsive > table {
     min-width: 640px;
-    background-color: transparent !important;
+    background-color: transparent;
 }
 
 .table-responsive thead,
-.table-responsive tbody,
-.table-responsive tfoot,
-.table-responsive tr,
 .table-responsive th,
-.table-responsive > table thead,
-.table-responsive > table tbody,
-.table-responsive > table tfoot,
-.table-responsive > table tr {
-    background-color: transparent !important;
+.table-responsive tr {
+    background-color: transparent;
+}
+
+/* Corporate Pelindo Data Table */
+.table-pelindo {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.table-pelindo thead th {
+    position: sticky;
+    top: 0;
+    background-color: #f8fafc !important;
+    color: #475569;
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e2e8f0;
+    z-index: 10;
+}
+
+.table-pelindo tbody tr {
+    transition: background-color 0.15s ease-in-out;
+}
+
+.table-pelindo tbody tr:nth-child(even) {
+    background-color: #fafbfc;
+}
+
+.table-pelindo tbody tr:hover {
+    background-color: #f0f7ff !important;
+}
+
+.table-pelindo tbody td {
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* 4-Tier Predicate Badges */
+.badge-predicate {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.badge-predicate-sangat-baik {
+    background-color: #dcfce7 !important;
+    color: #15803d !important;
+    border: 1px solid #86efac;
+}
+
+.badge-predicate-baik {
+    background-color: #e0f2fe !important;
+    color: #0369a1 !important;
+    border: 1px solid #7dd3fc;
+}
+
+.badge-predicate-cukup {
+    background-color: #fef9c3 !important;
+    color: #a16207 !important;
+    border: 1px solid #fde047;
+}
+
+.badge-predicate-kurang {
+    background-color: #fee2e2 !important;
+    color: #b91c1c !important;
+    border: 1px solid #fca5a5;
+}
+
+/* Top Page Transition Progress Bar */
+.top-loading-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    width: 0%;
+    background: linear-gradient(90deg, #005b9f, #00a3e0);
+    z-index: 99999;
+    opacity: 0;
+    transition: width 0.25s ease-out, opacity 0.2s ease-in;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(0, 163, 224, 0.6);
+}
+
+.top-loading-bar.is-loading {
+    opacity: 1;
+    width: 75%;
+    animation: topProgressTrickle 3s cubic-bezier(0.1, 0.05, 0.25, 1) forwards;
+}
+
+.top-loading-bar.is-finished {
+    width: 100% !important;
+    opacity: 0;
+    transition: width 0.15s ease-out, opacity 0.35s ease-out 0.1s;
+}
+
+@keyframes topProgressTrickle {
+    0% { width: 15%; }
+    50% { width: 65%; }
+    100% { width: 85%; }
+}
+
+/* Export Button & Action Loading States */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spinner-border-sm {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid currentColor;
+    border-right-color: transparent !important;
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
+    vertical-align: -0.125em;
+}
+
+.btn-export-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.85;
 }
 
 .data-table {
@@ -3883,4 +4019,93 @@ body.sidebar-locked {
     display: flex;
     flex-direction: column;
     gap: 4px;
+}
+
+/* Shared Shell Branding, Topbar Profile & Icon Sizing Guards */
+.brand-logo-sidebar-admin {
+    padding: 20px 24px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: #001F35;
+}
+.brand-logo-sidebar-admin img {
+    max-width: 175px;
+    height: auto;
+    object-fit: contain;
+    margin-bottom: 10px;
+}
+.brand-logo-sidebar {
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: #001F35;
+}
+.brand-logo-sidebar img {
+    max-width: 190px;
+    height: auto;
+    object-fit: contain;
+}
+.admin-badge-pill {
+    background: rgba(0, 163, 224, 0.15);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    padding: 3px 12px;
+    border-radius: 999px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+}
+.user-topbar-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.admin-avatar-circle,
+.user-avatar-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    box-shadow: 0 2px 6px rgba(0, 95, 168, 0.3);
+}
+.admin-avatar-circle {
+    background: linear-gradient(135deg, #005FA8, #0369a1);
+}
+.user-avatar-circle {
+    background: linear-gradient(135deg, #00223B, #005FA8);
+}
+.badge-counter {
+    background: #b91c1c;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-inline-start: auto;
+}
+nav[role="navigation"] svg,
+nav svg,
+.pagination svg,
+.w-5.h-5,
+svg.w-5,
+svg.h-5,
+svg[viewBox="0 0 20 20"] {
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    max-width: 16px !important;
+    max-height: 16px !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
 }

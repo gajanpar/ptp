@@ -1,4 +1,4 @@
-@extends('layouts.admin', ['title' => 'Master Karyawan TAD'])
+@extends(Auth::user()->isAdmin() ? 'layouts.admin' : 'layouts.app', ['title' => 'Master Karyawan TAD'])
 
 @section('content')
 <div class="page-title-box" style="margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
@@ -8,12 +8,14 @@
     </div>
 
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <button type="button" onclick="openDivisionModal()" style="background: #ffffff; color: #0f172a; border: 1px solid #64748b; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0369a1" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
-            <span>Kelola Divisi ({{ $divisions->count() }})</span>
-        </button>
+        @if(Auth::user()->isAdmin())
+            <button type="button" onclick="openDivisionModal()" style="background: #ffffff; color: #0f172a; border: 1px solid #64748b; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0369a1" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                <span>Kelola Divisi ({{ $divisions->count() }})</span>
+            </button>
+        @endif
 
-        <button type="button" onclick="openCreateEmployeeModal()" style="background: #005FA8; color: #ffffff; border: none; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(0, 95, 168, 0.25);">
+        <button type="button" onclick="openCreateEmployeeModal()" style="background: var(--pelindo-blue-primary, #005b9f); color: #ffffff; border: none; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(0, 91, 159, 0.25);">
             <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             <span>Tambah Karyawan TAD</span>
         </button>
@@ -82,15 +84,17 @@
             <input type="text" id="empSearchInput" name="search" value="{{ $search }}" aria-label="Cari nama karyawan, NIK TAD, jabatan, atau vendor" placeholder="Cari nama karyawan, NIK TAD, jabatan, atau vendor..." class="form-control-custom" style="width: 100%; padding: 8px 14px; font-size: 13px; border: 1px solid #64748b; border-radius: 8px;">
         </div>
 
-        <div style="display: flex; align-items: center; gap: 8px;">
-            <label for="empFilterDivision" style="font-size: 13px; font-weight: 600; color: #475569;">Divisi:</label>
-            <select id="empFilterDivision" name="division_id" onchange="this.form.submit()" class="form-control-custom" style="padding: 8px 12px; font-size: 13px; border: 1px solid #64748b; border-radius: 8px; width: auto; max-width: 100%; min-width: 0;">
-                <option value="all" {{ $currentDivision === 'all' ? 'selected' : '' }}>Semua Divisi</option>
-                @foreach($divisions as $div)
-                    <option value="{{ $div->id }}" {{ (string) $currentDivision === (string) $div->id ? 'selected' : '' }}>{{ $div->name }}</option>
-                @endforeach
-            </select>
-        </div>
+        @if(Auth::user()->isAdmin())
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="empFilterDivision" style="font-size: 13px; font-weight: 600; color: #475569;">Divisi:</label>
+                <select id="empFilterDivision" name="division_id" onchange="this.form.submit()" class="form-control-custom" style="padding: 8px 12px; font-size: 13px; border: 1px solid #64748b; border-radius: 8px; width: auto; max-width: 100%; min-width: 0;">
+                    <option value="all" {{ $currentDivision === 'all' ? 'selected' : '' }}>Semua Divisi</option>
+                    @foreach($divisions as $div)
+                        <option value="{{ $div->id }}" {{ (string) $currentDivision === (string) $div->id ? 'selected' : '' }}>{{ $div->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
 
         <div style="display: flex; align-items: center; gap: 8px;">
             <label for="empFilterStatus" style="font-size: 13px; font-weight: 600; color: #475569;">Status:</label>
@@ -127,7 +131,7 @@
         </div>
     @else
         <div class="table-responsive">
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <table class="table-pelindo data-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
                 <thead>
                     <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 11px; text-transform: uppercase;">
                         <th style="padding: 13px 18px; text-align: start; width: 48px;">No</th>
@@ -215,24 +219,24 @@
                                         </button>
                                     </form>
 
-                                    @if($emp->evaluations_count === 0 && $emp->edit_requests_count === 0)
-                                        <form method="POST"
-                                              action="{{ route('admin.employees.destroy', $emp->id) }}"
-                                              class="js-confirm-employee-form"
-                                              data-emp-name="{{ $emp->name }}"
-                                              data-action-type="delete"
-                                              style="margin: 0;">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit"
-                                                    class="table-action-btn"
-                                                    aria-label="Hapus permanen {{ $emp->name }}"
-                                                    title="Hapus permanen {{ $emp->name }}"
-                                                    style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 5px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
-                                                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                            </button>
-                                        </form>
-                                    @endif
+                                    <form method="POST"
+                                          action="{{ route('admin.employees.destroy', $emp->id) }}"
+                                          class="js-confirm-employee-form"
+                                          data-emp-name="{{ $emp->name }}"
+                                          data-action-type="delete"
+                                          data-eval-count="{{ $emp->evaluations_count }}"
+                                          data-has-history="{{ ($emp->evaluations_count > 0 || $emp->edit_requests_count > 0) ? '1' : '0' }}"
+                                          style="margin: 0;">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit"
+                                                class="table-action-btn"
+                                                aria-label="Hapus permanen {{ $emp->name }}"
+                                                title="Hapus permanen {{ $emp->name }}"
+                                                style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; padding: 5px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;">
+                                            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -261,12 +265,17 @@
             </div>
             <div>
                 <label for="create_emp_division" style="display: block; font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 6px;">Divisi Penempatan <span style="color: #b91c1c;">*</span></label>
-                <select id="create_emp_division" name="division_id" required class="form-control-custom" style="width: 100%; padding: 8px 12px; border: 1px solid #64748b; border-radius: 6px; font-size: 13px;">
-                    <option value="">-- Pilih Divisi --</option>
-                    @foreach($activeDivisions as $div)
-                        <option value="{{ $div->id }}">{{ $div->name }}</option>
-                    @endforeach
-                </select>
+                @if(Auth::user()->isKepalaDivisi())
+                    <input type="hidden" name="division_id" value="{{ Auth::user()->division_id }}">
+                    <input type="text" class="form-control-custom" readonly value="{{ Auth::user()->division->name ?? 'Divisi Anda' }}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; font-size: 13px; color: #475569;">
+                @else
+                    <select id="create_emp_division" name="division_id" required class="form-control-custom" style="width: 100%; padding: 8px 12px; border: 1px solid #64748b; border-radius: 6px; font-size: 13px;">
+                        <option value="">-- Pilih Divisi --</option>
+                        @foreach($activeDivisions as $div)
+                            <option value="{{ $div->id }}">{{ $div->name }}</option>
+                        @endforeach
+                    </select>
+                @endif
             </div>
         </div>
 
@@ -287,7 +296,7 @@
 
         <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; border-top: 1px solid #e2e8f0; padding-top: 16px;">
             <button type="button" onclick="closeCreateEmployeeModal()" style="background: #f1f5f9; color: #334155; border: 1px solid #64748b; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Batal</button>
-            <button type="submit" style="background: #005FA8; color: #ffffff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Simpan Karyawan</button>
+            <button type="submit" style="background: var(--pelindo-blue-primary, #005b9f); color: #ffffff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Simpan Karyawan</button>
         </div>
     </form>
 </dialog>
@@ -307,11 +316,16 @@
             </div>
             <div>
                 <label for="edit_emp_division" style="display: block; font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 6px;">Divisi Penempatan <span style="color: #b91c1c;">*</span></label>
-                <select name="division_id" id="edit_emp_division" required class="form-control-custom" style="width: 100%; padding: 8px 12px; border: 1px solid #64748b; border-radius: 6px; font-size: 13px;">
-                    @foreach($divisions as $div)
-                        <option value="{{ $div->id }}">{{ $div->name }}</option>
-                    @endforeach
-                </select>
+                @if(Auth::user()->isKepalaDivisi())
+                    <input type="hidden" name="division_id" id="edit_emp_division" value="{{ Auth::user()->division_id }}">
+                    <input type="text" class="form-control-custom" readonly value="{{ Auth::user()->division->name ?? 'Divisi Anda' }}" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; font-size: 13px; color: #475569;">
+                @else
+                    <select name="division_id" id="edit_emp_division" required class="form-control-custom" style="width: 100%; padding: 8px 12px; border: 1px solid #64748b; border-radius: 6px; font-size: 13px;">
+                        @foreach($divisions as $div)
+                            <option value="{{ $div->id }}">{{ $div->name }}</option>
+                        @endforeach
+                    </select>
+                @endif
             </div>
         </div>
 
@@ -341,12 +355,13 @@
 
         <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; border-top: 1px solid #e2e8f0; padding-top: 16px;">
             <button type="button" onclick="closeEditEmployeeModal()" style="background: #f1f5f9; color: #334155; border: 1px solid #64748b; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Batal</button>
-            <button type="submit" style="background: #005FA8; color: #ffffff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Simpan Perubahan</button>
+            <button type="submit" style="background: var(--pelindo-blue-primary, #005b9f); color: #ffffff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Simpan Perubahan</button>
         </div>
     </form>
 </dialog>
 
-<!-- Modal Kelola Divisi (Native Dialog, Overflow-Safe) -->
+@if(Auth::user()->isAdmin())
+<!-- Modal Divisi (Native Dialog, Overflow-Safe) -->
 <dialog id="divisionModal" class="modal-dialog" aria-labelledby="divisionModalTitle" style="text-align: start; max-width: 600px;">
     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px;">
         <div>
@@ -363,7 +378,7 @@
         <div class="modal-division-add-grid">
             <input type="text" name="name" required aria-label="Nama divisi baru" placeholder="Nama Divisi" class="form-control-custom" style="width: 100%; padding: 7px 10px; border: 1px solid #64748b; border-radius: 6px; font-size: 13px;">
             <input type="text" name="description" aria-label="Deskripsi divisi baru" placeholder="Deskripsi singkat unit kerja" class="form-control-custom" style="width: 100%; padding: 7px 10px; border: 1px solid #64748b; border-radius: 6px; font-size: 13px;">
-            <button type="submit" style="background: #005FA8; color: #ffffff; border: none; padding: 8px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer;">Tambah</button>
+            <button type="submit" style="background: var(--pelindo-blue-primary, #005b9f); color: #ffffff; border: none; padding: 8px 14px; border-radius: 6px; font-size: 12.5px; font-weight: 600; cursor: pointer;">Tambah</button>
         </div>
     </form>
 
@@ -387,13 +402,14 @@
         @endforeach
     </div>
 </dialog>
+@endif
 
 <!-- Modal Konfirmasi Kontekstual Tindakan Personel (Nonaktifkan / Hapus Permanen) -->
 <dialog id="confirmEmployeeActionModal" class="modal-dialog" aria-labelledby="confirmEmpActionTitle" style="text-align: start; max-width: 440px;">
     <h3 id="confirmEmpActionTitle" style="font-size: 17px; font-weight: 700; color: #0f172a; margin: 0 0 8px 0;">Konfirmasi Tindakan Personel</h3>
     <p id="confirmEmpActionDesc" style="font-size: 13.5px; color: #475569; line-height: 1.55; margin: 0 0 20px 0;"></p>
     <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
-        <button type="button" onclick="closeDialogById('confirmEmployeeActionModal')" style="background: #f1f5f9; color: #334155; border: 1px solid #64748b; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Batal</button>
+        <button type="button" id="confirmEmpActionCancelBtn" onclick="closeDialogById('confirmEmployeeActionModal')" style="background: #f1f5f9; color: #334155; border: 1px solid #64748b; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Batal</button>
         <button type="button" id="confirmEmpActionSubmitBtn" style="background: #b91c1c; color: #ffffff; border: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Konfirmasi</button>
     </div>
 </dialog>
@@ -431,6 +447,21 @@
         });
     });
 
+    function setSafeModalDescription(container, parts) {
+        container.textContent = '';
+        parts.forEach(function(part) {
+            if (part.br) {
+                container.appendChild(document.createElement('br'));
+            } else if (part.strong) {
+                var strong = document.createElement('strong');
+                strong.textContent = part.text;
+                container.appendChild(strong);
+            } else {
+                container.appendChild(document.createTextNode(part.text));
+            }
+        });
+    }
+
     var pendingEmployeeForm = null;
     document.querySelectorAll('.js-confirm-employee-form').forEach(function(form) {
         form.addEventListener('submit', function(e) {
@@ -443,18 +474,52 @@
             var name = form.dataset.empName || 'personel ini';
             var titleEl = document.getElementById('confirmEmpActionTitle');
             var descEl = document.getElementById('confirmEmpActionDesc');
+            var cancelBtn = document.getElementById('confirmEmpActionCancelBtn');
             var submitBtn = document.getElementById('confirmEmpActionSubmitBtn');
 
             if (type === 'delete') {
-                titleEl.textContent = 'Hapus Permanen Personel';
-                descEl.textContent = 'Data karyawan "' + name + '" akan dihapus permanen dari direktori cabang. Tindakan ini tidak dapat dibatalkan.';
-                submitBtn.textContent = 'Hapus Permanen';
-                submitBtn.style.background = '#b91c1c';
+                var hasHistory = form.dataset.hasHistory === '1';
+                var evalCount = form.dataset.evalCount || '0';
+                if (hasHistory) {
+                    titleEl.textContent = 'Perlindungan Arsip Riwayat Evaluasi';
+                    setSafeModalDescription(descEl, [
+                        { text: 'Personel ' },
+                        { strong: true, text: name },
+                        { text: ' memiliki ' },
+                        { strong: true, text: evalCount + ' periode riwayat evaluasi' },
+                        { text: '. Demi integritas audit perusahaan, data yang memiliki riwayat penilaian tidak dapat dihapus permanen.' },
+                        { br: true },
+                        { br: true },
+                        { text: 'Gunakan tombol ' },
+                        { strong: true, text: 'Nonaktifkan' },
+                        { text: ' untuk mengeluarkan personel dari antrian aktif tanpa merusak arsip historis.' }
+                    ]);
+                    submitBtn.style.display = 'none';
+                    cancelBtn.textContent = 'Mengerti';
+                    pendingEmployeeForm = null;
+                } else {
+                    titleEl.textContent = 'Hapus Permanen Personel';
+                    setSafeModalDescription(descEl, [
+                        { text: 'Data karyawan ' },
+                        { strong: true, text: name },
+                        { text: ' akan dihapus permanen dari direktori cabang. Tindakan ini tidak dapat dibatalkan.' }
+                    ]);
+                    submitBtn.style.display = 'inline-block';
+                    submitBtn.textContent = 'Hapus Permanen';
+                    submitBtn.style.background = '#b91c1c';
+                    cancelBtn.textContent = 'Batal';
+                }
             } else {
                 titleEl.textContent = 'Nonaktifkan Personel TAD';
-                descEl.textContent = 'Karyawan "' + name + '" akan dikeluarkan dari antrian evaluasi aktif, namun seluruh riwayat nilai historis tetap tersimpan aman.';
+                setSafeModalDescription(descEl, [
+                    { text: 'Karyawan ' },
+                    { strong: true, text: name },
+                    { text: ' akan dikeluarkan dari antrian evaluasi aktif, namun seluruh riwayat nilai historis tetap tersimpan aman.' }
+                ]);
+                submitBtn.style.display = 'inline-block';
                 submitBtn.textContent = 'Nonaktifkan Personel';
                 submitBtn.style.background = '#c2410c';
+                cancelBtn.textContent = 'Batal';
             }
             openDialogById('confirmEmployeeActionModal');
         });

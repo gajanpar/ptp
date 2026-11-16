@@ -22,11 +22,11 @@ class BackupController extends Controller
         $backups = $this->backupService->listBackups();
 
         $totalBytes = array_sum(array_column($backups, 'size'));
-        $totalFormatted = $this->formatBytes($totalBytes);
+        $totalFormatted = BackupService::formatBytes($totalBytes);
 
         // Approximate free disk space of storage directory
         $freeDiskBytes = disk_free_space(storage_path());
-        $freeDiskFormatted = $freeDiskBytes !== false ? $this->formatBytes((int) $freeDiskBytes) : 'Tersedia';
+        $freeDiskFormatted = $freeDiskBytes !== false ? BackupService::formatBytes((int) $freeDiskBytes) : 'Tersedia';
 
         return view('admin.system.backup', [
             'backups' => $backups,
@@ -89,19 +89,5 @@ class BackupController extends Controller
         } catch (\InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
-    }
-
-    /**
-     * Helper to format bytes into readable string.
-     */
-    protected function formatBytes(int $bytes): string
-    {
-        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        $bytes = max($bytes, 0);
-        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-        $pow = min($pow, count($units) - 1);
-        $bytes /= (1 << (10 * $pow));
-
-        return round($bytes, 2).' '.$units[$pow];
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureCanManageEmployees;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\SecurityHeadersMiddleware;
@@ -25,6 +26,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
+            'can_manage_employees' => EnsureCanManageEmployees::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

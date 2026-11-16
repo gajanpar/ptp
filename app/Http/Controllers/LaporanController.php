@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Evaluation;
+use App\Services\EvaluationScoringService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -25,16 +26,10 @@ class LaporanController extends Controller
             ->orderBy('total_score', 'desc')
             ->get();
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
-
         return view('user.laporan.index', [
             'month' => $month,
             'year' => $year,
-            'monthNames' => $monthNames,
+            'monthNames' => EvaluationScoringService::MONTH_NAMES,
             'evaluations' => $evaluations,
             'totalEvaluations' => $evaluations->count(),
         ]);
@@ -48,58 +43,35 @@ class LaporanController extends Controller
         $evaluation = Evaluation::with(['employee', 'evaluator', 'details.subcategory.category'])
             ->findOrFail($id);
 
-        if ($divisionId && $evaluation->division_id !== $divisionId) {
+        if ($divisionId && (int) $evaluation->division_id !== (int) $divisionId) {
             abort(403, 'Anda tidak berhak melihat data divisi lain.');
-        }
-
-        // Kelompokkan details berdasarkan kategori
-        $groupedDetails = [];
-        foreach ($evaluation->details as $detail) {
-            $cat = $detail->subcategory->category;
-            $catId = $cat->id;
-            if (! isset($groupedDetails[$catId])) {
-                $groupedDetails[$catId] = [
-                    'category' => $cat,
-                    'items' => [],
-                ];
-            }
-            $groupedDetails[$catId]['items'][] = $detail;
         }
 
         return view('user.laporan.detail', [
             'evaluation' => $evaluation,
-            'groupedDetails' => $groupedDetails,
+            'groupedDetails' => EvaluationScoringService::groupDetailsByCategory($evaluation->details),
         ]);
     }
 
-    public function print($id)
+    public function print(Request $request, $id)
     {
         $user = Auth::user();
         $divisionId = $user->division_id;
+        $action = in_array($request->get('action'), ['print', 'save_pdf'], true)
+            ? $request->get('action')
+            : 'print';
 
         $evaluation = Evaluation::with(['employee', 'evaluator', 'details.subcategory.category'])
             ->findOrFail($id);
 
-        if ($divisionId && $evaluation->division_id !== $divisionId) {
+        if ($divisionId && (int) $evaluation->division_id !== (int) $divisionId) {
             abort(403);
-        }
-
-        $groupedDetails = [];
-        foreach ($evaluation->details as $detail) {
-            $cat = $detail->subcategory->category;
-            $catId = $cat->id;
-            if (! isset($groupedDetails[$catId])) {
-                $groupedDetails[$catId] = [
-                    'category' => $cat,
-                    'items' => [],
-                ];
-            }
-            $groupedDetails[$catId]['items'][] = $detail;
         }
 
         return view('user.laporan.print', [
             'evaluation' => $evaluation,
-            'groupedDetails' => $groupedDetails,
+            'groupedDetails' => EvaluationScoringService::groupDetailsByCategory($evaluation->details),
+            'action' => $action,
         ]);
     }
 }

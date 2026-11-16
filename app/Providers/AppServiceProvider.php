@@ -30,7 +30,10 @@ class AppServiceProvider extends ServiceProvider
         Paginator::defaultView('vendor.pagination.corporate');
         Paginator::defaultSimpleView('vendor.pagination.corporate');
 
-        view()->composer('*', function ($view) {
+        view()->composer([
+            'admin.reports.print_*',
+            'user.laporan.print',
+        ], function ($view) {
             $view->with('branchSettings', Setting::getAllKeyValue());
         });
     }

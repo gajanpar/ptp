@@ -33,10 +33,12 @@ class AuthController extends ApiController
         $password = (string) $request->input('password');
         $deviceName = $request->input('device_name') ?: 'SPKTAD Mobile / Client API';
 
-        // Search by username or email
+        // Search by username or email (grouped to keep the OR clause scoped).
         $user = User::with('division')
-            ->where('username', $login)
-            ->orWhere('email', $login)
+            ->where(function ($query) use ($login) {
+                $query->where('username', $login)
+                    ->orWhere('email', $login);
+            })
             ->first();
 
         if (! $user || ! Hash::check($password, $user->password)) {

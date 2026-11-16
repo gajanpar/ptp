@@ -7,32 +7,102 @@ use App\Models\Division;
 use App\Models\EditRequest;
 use App\Models\Employee;
 use App\Models\Evaluation;
-use App\Models\EvaluationCategory;
-use App\Models\EvaluationDetail;
 use App\Models\PeriodManagement;
 use App\Models\User;
+use App\Services\EvaluationScoringService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $month = (int) $request->get('month', 5);
-        $year = (int) $request->get('year', 2026);
+        $defaultMonth = (int) date('n');
+        $defaultYear = (int) date('Y');
 
-        // Metrik Global Cabang
-        $totalEmployees = Employee::where('is_active', true)->count();
-        $totalDivisions = Division::where('is_active', true)->count();
-        $totalPenilai = User::where('role', 'kepala_divisi')->where('is_active', true)->count();
-        $pendingRequestsCount = EditRequest::where('status', 'pending')->count();
+        $month = (int) $request->get('month', $defaultMonth);
+        $year = (int) $request->get('year', $defaultYear);
+        if ($month < 1 || $month > 12) {
+            $month = $defaultMonth;
+        }
+        if ($year < 2020 || $year > 2035) {
+            $year = $defaultYear;
+        }
 
-        // Evaluasi Cabang di Periode Ini
-        $evaluations = Evaluation::with(['employee.division'])
+        $prevMonth = $month == 1 ? 12 : $month - 1;
+        $prevYear = $month == 1 ? $year - 1 : $year;
+
+        // 1. Consolidated divisions + global metrics in a single query (1 query)
+        // Query all divisions (both active and inactive) so relations can be resolved in memory without N+1 lazy loads.
+        $allDivisions = Division::select('divisions.*')
+            ->addSelect([
+                'total_penilai' => User::selectRaw('COUNT(id)')->where('role', 'kepala_divisi')->where('is_active', true),
+                'pending_requests' => EditRequest::selectRaw('COUNT(id)')->where('status', 'pending'),
+                'prev_avg' => Evaluation::selectRaw('AVG(total_score)')->where('period_month', $prevMonth)->where('period_year', $prevYear),
+                'period_status' => PeriodManagement::select('status')
+                    ->whereColumn('period_management.division_id', 'divisions.id')
+                    ->where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->limit(1),
+                'penilai_name' => User::select('name')
+                    ->whereColumn('users.division_id', 'divisions.id')
+                    ->where('role', 'kepala_divisi')
+                    ->where('is_active', true)
+                    ->limit(1),
+            ])
+            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->get();
+
+        $allDivisionsById = $allDivisions->keyBy('id');
+        $divisions = $allDivisions->where('is_active', true)->values();
+
+        $firstDiv = $allDivisions->first();
+        if ($firstDiv !== null) {
+            $totalPenilai = (int) ($firstDiv->total_penilai ?? 0);
+            $pendingRequestsCount = (int) ($firstDiv->pending_requests ?? 0);
+            $prevAvg = $firstDiv->prev_avg !== null ? (float) $firstDiv->prev_avg : null;
+        } else {
+            $fallbackStats = DB::selectOne('
+                SELECT 
+                    (SELECT COUNT(id) FROM users WHERE role = ? AND is_active = ?) as total_penilai,
+                    (SELECT COUNT(id) FROM edit_requests WHERE status = ?) as pending_requests,
+                    (SELECT AVG(total_score) FROM evaluations WHERE period_month = ? AND period_year = ?) as prev_avg
+            ', ['kepala_divisi', true, 'pending', $prevMonth, $prevYear]);
+            $totalPenilai = (int) ($fallbackStats->total_penilai ?? 0);
+            $pendingRequestsCount = (int) ($fallbackStats->pending_requests ?? 0);
+            $prevAvg = $fallbackStats->prev_avg !== null ? (float) $fallbackStats->prev_avg : null;
+        }
+
+        // Hydrate users relation in memory for each division to prevent lazy-load when Blade accesses $div->users
+        foreach ($divisions as $div) {
+            if ($div->penilai_name) {
+                $div->setRelation('users', collect([
+                    new User(['name' => $div->penilai_name, 'role' => 'kepala_divisi', 'is_active' => true]),
+                ]));
+            } else {
+                $div->setRelation('users', collect());
+            }
+        }
+
+        $totalDivisions = $divisions->count();
+        $totalEmployees = (int) $divisions->sum('employees_count');
+
+        // 2. Evaluations for this period with eager-loaded employee
+        $evaluations = Evaluation::with(['employee'])
             ->where('period_month', $month)
             ->where('period_year', $year)
             ->get();
+
+        // Link pre-loaded divisions in memory (both active and inactive) to avoid N+1 queries in Blade
+        foreach ($evaluations as $eval) {
+            if ($eval->division_id && $allDivisionsById->has($eval->division_id)) {
+                $eval->setRelation('division', $allDivisionsById->get($eval->division_id));
+            } else {
+                $eval->setRelation('division', null);
+            }
+        }
 
         $totalEvaluated = $evaluations->count();
         $totalPending = max(0, $totalEmployees - $totalEvaluated);
@@ -70,32 +140,12 @@ class DashboardController extends Controller
             $predicatePercentages[$key] = $totalEvaluated > 0 ? round(($cnt / $totalEvaluated) * 100, 1) : 0;
         }
 
-        // 1. Diagnostik 6 Nilai Inti AKHLAK Cabang
-        $evalIds = $evaluations->pluck('id');
-        $akhlakStats = [];
-        $akhlakCategories = EvaluationCategory::whereIn('name', ['Amanah', 'Kompeten', 'Harmonis', 'Loyal', 'Adaptif', 'Kolaboratif'])
-            ->with('subcategories')
-            ->orderBy('order_index')
-            ->get();
-
-        foreach ($akhlakCategories as $cat) {
-            $subIds = $cat->subcategories->pluck('id');
-            $avgScore = $evalIds->isNotEmpty()
-                ? EvaluationDetail::whereIn('evaluation_id', $evalIds)->whereIn('subcategory_id', $subIds)->avg('score')
-                : null;
-
-            // Normalized to 100% (max 5.88)
-            $normalizedScore = $avgScore ? round(($avgScore / 5.88) * 100, 1) : 0;
-            $akhlakStats[$cat->name] = [
-                'name' => $cat->name,
-                'raw_avg' => $avgScore ? round((float)$avgScore, 2) : 0,
-                'score_100' => $normalizedScore,
-            ];
-        }
+        // 4. Diagnostik 6 Nilai Inti AKHLAK Cabang (Single consolidated SQL aggregate)
+        $akhlakStats = EvaluationScoringService::computeAkhlakStats($evaluations->pluck('id'));
 
         $weakestPillar = null;
         $strongestPillar = null;
-        if ($totalEvaluated > 0 && !empty($akhlakStats)) {
+        if ($totalEvaluated > 0 && ! empty($akhlakStats)) {
             $scores = array_column($akhlakStats, 'score_100', 'name');
             asort($scores);
             $weakestPillar = [
@@ -113,13 +163,13 @@ class DashboardController extends Controller
         $bottomPerformers = $evaluations->sortBy('total_score')->take(5)->values();
 
         // 3. Countdown SLA Gembok (Cutoff tgl 25)
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
-        $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59);
+        try {
+            $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59);
+        } catch (\Throwable $e) {
+            $cutoffDate = Carbon::now()->endOfMonth();
+        }
         $now = Carbon::now();
         $isCutoffPassed = $now->greaterThan($cutoffDate);
         $slaDaysRemaining = $isCutoffPassed ? 0 : max(0, (int) $now->diffInDays($cutoffDate, false));
@@ -132,31 +182,22 @@ class DashboardController extends Controller
         ];
 
         // 5. Tren Nilai Antar-Bulan (Month-over-Month MoM)
-        $prevMonth = $month == 1 ? 12 : $month - 1;
-        $prevYear = $month == 1 ? $year - 1 : $year;
-        $prevAvg = Evaluation::where('period_month', $prevMonth)
-            ->where('period_year', $prevYear)
-            ->avg('total_score');
-
         $momDelta = ($averageScore > 0 && $prevAvg) ? round($averageScore - $prevAvg, 1) : null;
         $prevMonthName = $monthNames[$prevMonth] ?? '-';
 
-        // Ringkasan per Divisi
-        $divisions = Division::where('is_active', true)->withCount(['employees' => function ($q) {
-            $q->where('is_active', true);
-        }])->get();
+        // Ringkasan per Divisi (In-Memory Collection Reuse)
+        $currentMonth = (int) date('n');
+        $currentYear = (int) date('Y');
+        $defaultStatus = ($month === $currentMonth && $year === $currentYear) ? 'open' : 'closed';
 
+        $evaluationsByDivision = $evaluations->groupBy('division_id');
         $divisionStats = [];
         $lockedDivisionsCount = 0;
 
         foreach ($divisions as $div) {
-            $divEvals = Evaluation::where('division_id', $div->id)
-                ->where('period_month', $month)
-                ->where('period_year', $year)
-                ->get();
-
+            $divEvals = $evaluationsByDivision->get($div->id, collect());
             $evalCount = $divEvals->count();
-            $status = PeriodManagement::getStatus($div->id, $month, $year);
+            $status = $div->period_status ?? $defaultStatus;
             if ($status === 'closed') {
                 $lockedDivisionsCount++;
             }
@@ -174,12 +215,29 @@ class DashboardController extends Controller
             ];
         }
 
-        // Permohonan Akses Terbaru
-        $recentRequests = EditRequest::with(['requester', 'division', 'employee'])
-            ->where('status', 'pending')
-            ->orderBy('created_at', 'desc')
-            ->take(5)
-            ->get();
+        // Permohonan Akses Terbaru (Consolidated 1 query with leftJoin instead of 4 separate queries)
+        $recentRequests = $pendingRequestsCount > 0
+            ? EditRequest::query()
+                ->leftJoin('users as requesters', 'edit_requests.requested_by', '=', 'requesters.id')
+                ->leftJoin('divisions', 'edit_requests.division_id', '=', 'divisions.id')
+                ->leftJoin('employees', 'edit_requests.employee_id', '=', 'employees.id')
+                ->where('edit_requests.status', 'pending')
+                ->orderBy('edit_requests.created_at', 'desc')
+                ->take(5)
+                ->select([
+                    'edit_requests.*',
+                    'requesters.name as requester_name',
+                    'divisions.name as division_name',
+                    'employees.name as employee_name',
+                ])
+                ->get()
+            : collect();
+
+        foreach ($recentRequests as $req) {
+            $req->setRelation('requester', $req->requester_name ? new User(['name' => $req->requester_name]) : null);
+            $req->setRelation('division', $req->division_name ? new Division(['name' => $req->division_name]) : null);
+            $req->setRelation('employee', $req->employee_name ? new Employee(['name' => $req->employee_name]) : null);
+        }
 
         return view('admin.dashboard', [
             'user' => Auth::user(),
@@ -209,7 +267,7 @@ class DashboardController extends Controller
             'strongestPillar' => $strongestPillar,
             'topPerformers' => $topPerformers,
             'bottomPerformers' => $bottomPerformers,
-            'slaCutoffDate' => '25 ' . ($monthNames[$month] ?? '-') . ' ' . $year . ', 23:59 WIB',
+            'slaCutoffDate' => '25 '.($monthNames[$month] ?? '-').' '.$year.', 23:59 WIB',
             'slaDaysRemaining' => $slaDaysRemaining,
             'isCutoffPassed' => $isCutoffPassed,
             'contractRecommendations' => $contractRecommendations,

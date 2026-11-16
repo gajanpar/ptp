@@ -21,8 +21,17 @@ class PenilaianController extends Controller
         $user = Auth::user();
         $divisionId = $user->division_id;
 
-        $month = (int) $request->get('month', 5);
-        $year = (int) $request->get('year', 2026);
+        $defaultMonth = (int) date('n');
+        $defaultYear = (int) date('Y');
+
+        $month = (int) $request->get('month', $defaultMonth);
+        $year = (int) $request->get('year', $defaultYear);
+        if ($month < 1 || $month > 12) {
+            $month = $defaultMonth;
+        }
+        if ($year < 2020 || $year > 2035) {
+            $year = $defaultYear;
+        }
         $activeTab = $request->get('tab', 'pending'); // 'pending' = Belum Dinilai, 'evaluated' = Sudah Dinilai
 
         // Ambil status periode
@@ -93,11 +102,7 @@ class PenilaianController extends Controller
             }
         }
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         return view('user.penilaian.index', [
             'month' => $month,
@@ -144,8 +149,9 @@ class PenilaianController extends Controller
         }
 
         // Cek hak akses periode
-        $isPeriodOpen = PeriodManagement::isOpen($divisionId, $month, $year);
-        $hasApprovedAccess = EditRequest::where('division_id', $divisionId)
+        $isPeriodOpen = PeriodManagement::isOpen((int) $employee->division_id, $month, $year);
+        $hasApprovedAccess = EditRequest::where('division_id', $employee->division_id)
+            ->where('request_type', 'division_access')
             ->where('period_month', $month)
             ->where('period_year', $year)
             ->where('status', 'approved')
@@ -159,11 +165,7 @@ class PenilaianController extends Controller
         $categories = EvaluationCategory::with('subcategories')->orderBy('order_index')->get();
         $ratingOptions = EvaluationScoringService::getRatingOptions();
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         return view('user.penilaian.form', [
             'employee' => $employee,
@@ -185,21 +187,23 @@ class PenilaianController extends Controller
 
         $evaluation = Evaluation::with(['employee', 'details'])->findOrFail($id);
 
-        if ($divisionId && $evaluation->division_id !== $divisionId) {
+        if ($divisionId && (int) $evaluation->division_id !== (int) $divisionId) {
             abort(403, 'Anda tidak berhak mengakses data penilaian divisi lain.');
         }
 
-        $month = $evaluation->period_month;
-        $year = $evaluation->period_year;
+        $evalDivisionId = (int) ($evaluation->employee->division_id ?? $evaluation->division_id);
+        $month = (int) $evaluation->period_month;
+        $year = (int) $evaluation->period_year;
 
         // Cek izin edit jika closed
-        $isPeriodOpen = PeriodManagement::isOpen($divisionId, $month, $year);
+        $isPeriodOpen = PeriodManagement::isOpen($evalDivisionId, $month, $year);
         $hasApprovedIndividual = EditRequest::where('employee_id', $evaluation->employee_id)
+            ->where('request_type', 'individual_edit')
             ->where('period_month', $month)
             ->where('period_year', $year)
             ->where('status', 'approved')
             ->exists();
-        $hasApprovedDivision = EditRequest::where('division_id', $divisionId)
+        $hasApprovedDivision = EditRequest::where('division_id', $evalDivisionId)
             ->where('period_month', $month)
             ->where('period_year', $year)
             ->where('request_type', 'division_access')
@@ -223,11 +227,7 @@ class PenilaianController extends Controller
             ];
         }
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         return view('user.penilaian.form', [
             'employee' => $evaluation->employee,
@@ -263,7 +263,7 @@ class PenilaianController extends Controller
         $employee = Employee::findOrFail($employeeId);
 
         // Security Hardening: Validasi Hak Akses Divisi (Anti-IDOR / Anti-BOLA)
-        if ($divisionId && $employee->division_id !== $divisionId) {
+        if ($divisionId && (int) $employee->division_id !== (int) $divisionId) {
             abort(403, 'Akses ditolak. Anda tidak memiliki otoritas untuk menilai karyawan dari unit divisi lain.');
         }
 
@@ -285,25 +285,26 @@ class PenilaianController extends Controller
             return back()->withInput()->with('error', 'Akses penilaian untuk periode ini sedang terkunci. Pengajuan pembukaan akses atau izin edit yang disetujui diperlukan.');
         }
 
-        // Pastikan semua 17 subkategori dinilai
-        $totalSubcategories = EvaluationSubcategory::count();
-        if (count($request->ratings) !== $totalSubcategories) {
-            return back()->withInput()->with('error', 'Harap isi seluruh '.$totalSubcategories.' butir penilaian yang tertera.');
+        // Pastikan semua 17 subkategori valid & dinilai
+        $validSubcategoryIds = EvaluationSubcategory::pluck('id')->all();
+        $totalSubcategories = count($validSubcategoryIds);
+        $ratings = $request->ratings;
+        if (count($ratings) !== $totalSubcategories || array_diff(array_keys($ratings), $validSubcategoryIds) !== []) {
+            return back()->withInput()->with('error', 'Harap isi seluruh '.$totalSubcategories.' butir penilaian yang valid.');
         }
 
-        $ratings = $request->ratings;
-        $reasons = $request->reasons ?? [];
+        $reasons = is_array($request->reasons) ? $request->reasons : [];
 
         $calc = EvaluationScoringService::calculate($ratings);
 
-        DB::transaction(function () use ($employeeId, $user, $divisionId, $month, $year, $calc, $ratings, $reasons) {
+        DB::transaction(function () use ($employeeId, $employee, $user, $month, $year, $calc, $ratings, $reasons) {
             $evaluation = Evaluation::updateOrCreate([
                 'employee_id' => $employeeId,
                 'period_month' => $month,
                 'period_year' => $year,
             ], [
                 'user_id' => $user->id,
-                'division_id' => $divisionId ?? 5,
+                'division_id' => $employee->division_id,
                 'total_score' => $calc['total_score'],
                 'average_score' => $calc['average_score'],
                 'predicate' => $calc['predicate'],
@@ -315,12 +316,16 @@ class PenilaianController extends Controller
             EvaluationDetail::where('evaluation_id', $evaluation->id)->delete();
 
             foreach ($ratings as $subcategoryId => $rating) {
+                $reasonText = isset($reasons[$subcategoryId]) && is_string($reasons[$subcategoryId])
+                    ? mb_substr(trim($reasons[$subcategoryId]), 0, 500)
+                    : '';
+
                 EvaluationDetail::create([
                     'evaluation_id' => $evaluation->id,
-                    'subcategory_id' => $subcategoryId,
+                    'subcategory_id' => (int) $subcategoryId,
                     'rating' => (int) $rating,
                     'score' => EvaluationScoringService::getRatingScore((int) $rating),
-                    'reason' => $reasons[$subcategoryId] ?? '',
+                    'reason' => $reasonText,
                 ]);
             }
 

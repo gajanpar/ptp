@@ -7,17 +7,46 @@ use App\Models\ActivityLog;
 use App\Models\Division;
 use App\Models\Employee;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class EmployeeController extends Controller
 {
     /**
+     * Verify that the current user has authority to manage the given employee.
+     */
+    protected function authorizeEmployeeDivision(Employee $employee, string $action = 'mengelola'): void
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            abort(401, 'Unauthenticated.');
+        }
+
+        if ($user->isAdmin()) {
+            return;
+        }
+
+        if ($user->isKepalaDivisi()) {
+            if ((int) $employee->division_id !== (int) $user->division_id) {
+                abort(403, "Akses ditolak. Anda tidak memiliki hak akses untuk {$action} personel dari unit divisi lain.");
+            }
+
+            return;
+        }
+
+        abort(403, 'Akses ditolak.');
+    }
+
+    /**
      * Display the TAD employee master directory with filtering and statistics.
      */
     public function index(Request $request): View
     {
+        $user = auth()->user();
         $search = trim((string) $request->get('search', ''));
         $currentDivision = (string) $request->get('division_id', 'all');
         $currentStatus = (string) $request->get('status', 'all');
@@ -36,7 +65,10 @@ class EmployeeController extends Controller
             });
         }
 
-        if ($currentDivision !== 'all') {
+        if ($user->isKepalaDivisi()) {
+            $currentDivision = (string) $user->division_id;
+            $query->where('division_id', $user->division_id);
+        } elseif ($currentDivision !== 'all') {
             $query->where('division_id', (int) $currentDivision);
         }
 
@@ -48,15 +80,32 @@ class EmployeeController extends Controller
 
         $employees = $query->paginate(15)->withQueryString();
 
-        $divisions = Division::withCount('employees')->orderBy('id')->get();
-        $activeDivisions = $divisions->where('is_active', true)->values();
-
-        $counts = [
-            'total' => Employee::count(),
-            'active' => Employee::where('is_active', true)->count(),
-            'inactive' => Employee::where('is_active', false)->count(),
-            'divisions' => $activeDivisions->count(),
-        ];
+        if ($user->isKepalaDivisi()) {
+            $divisions = Division::where('id', $user->division_id)->withCount('employees')->get();
+            $activeDivisions = $divisions;
+            $stats = DB::table('employees')
+                ->where('division_id', $user->division_id)
+                ->selectRaw('COUNT(*) as total, SUM(CASE WHEN is_active THEN 1 ELSE 0 END) as active, SUM(CASE WHEN NOT is_active THEN 1 ELSE 0 END) as inactive')
+                ->first();
+            $counts = [
+                'total' => (int) $stats->total,
+                'active' => (int) $stats->active,
+                'inactive' => (int) $stats->inactive,
+                'divisions' => 1,
+            ];
+        } else {
+            $divisions = Division::withCount('employees')->orderBy('id')->get();
+            $activeDivisions = $divisions->where('is_active', true)->values();
+            $stats = DB::table('employees')
+                ->selectRaw('COUNT(*) as total, SUM(CASE WHEN is_active THEN 1 ELSE 0 END) as active, SUM(CASE WHEN NOT is_active THEN 1 ELSE 0 END) as inactive')
+                ->first();
+            $counts = [
+                'total' => (int) $stats->total,
+                'active' => (int) $stats->active,
+                'inactive' => (int) $stats->inactive,
+                'divisions' => $activeDivisions->count(),
+            ];
+        }
 
         return view('admin.employees.index', [
             'employees' => $employees,
@@ -74,6 +123,12 @@ class EmployeeController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        $user = auth()->user();
+
+        if ($user->isKepalaDivisi()) {
+            $request->merge(['division_id' => $user->division_id]);
+        }
+
         $validated = $request->validate([
             'nik' => ['nullable', 'string', 'max:50', 'unique:employees,nik'],
             'name' => ['required', 'string', 'max:100'],
@@ -119,6 +174,13 @@ class EmployeeController extends Controller
      */
     public function update(Request $request, Employee $employee): RedirectResponse
     {
+        $this->authorizeEmployeeDivision($employee, 'memperbarui profil');
+
+        $user = auth()->user();
+        if ($user->isKepalaDivisi()) {
+            $request->merge(['division_id' => $user->division_id]);
+        }
+
         $validated = $request->validate([
             'nik' => [
                 'nullable',
@@ -160,6 +222,8 @@ class EmployeeController extends Controller
      */
     public function toggleStatus(Employee $employee): RedirectResponse
     {
+        $this->authorizeEmployeeDivision($employee, 'mengubah status');
+
         $newStatus = ! $employee->is_active;
         $employee->update(['is_active' => $newStatus]);
 
@@ -184,6 +248,8 @@ class EmployeeController extends Controller
      */
     public function destroy(Employee $employee): RedirectResponse
     {
+        $this->authorizeEmployeeDivision($employee, 'menghapus');
+
         if ($employee->evaluations()->exists() || $employee->editRequests()->exists()) {
             return back()->with(
                 'error',
@@ -191,19 +257,26 @@ class EmployeeController extends Controller
             );
         }
 
-        $name = $employee->name;
-        $nik = $employee->nik;
-        $employee->delete();
+        try {
+            $name = $employee->name;
+            $nik = $employee->nik;
+            $employee->delete();
 
-        ActivityLog::record(
-            'employee.deleted',
-            "Menghapus permanen data personel TAD: {$name} ({$nik})",
-            'Employee',
-            null,
-            ['deleted_name' => $name, 'deleted_nik' => $nik]
-        );
+            ActivityLog::record(
+                'employee.deleted',
+                "Menghapus permanen data personel TAD: {$name} ({$nik})",
+                'Employee',
+                null,
+                ['deleted_name' => $name, 'deleted_nik' => $nik]
+            );
 
-        return back()->with('success', "Entri karyawan {$name} berhasil dihapus.");
+            return back()->with('success', "Entri karyawan {$name} berhasil dihapus.");
+        } catch (QueryException $e) {
+            return back()->with(
+                'error',
+                "Data {$employee->name} tidak dapat dihapus karena masih terkait dengan catatan operasional lain pada sistem."
+            );
+        }
     }
 
     /**
@@ -211,6 +284,10 @@ class EmployeeController extends Controller
      */
     public function storeDivision(Request $request): RedirectResponse
     {
+        if (! auth()->user()->isAdmin()) {
+            abort(403, 'Akses ditolak. Pengelolaan divisi hanya diizinkan untuk Administrator SDM / IT.');
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100', 'unique:divisions,name'],
             'description' => ['nullable', 'string', 'max:255'],
@@ -239,6 +316,10 @@ class EmployeeController extends Controller
      */
     public function updateDivision(Request $request, Division $division): RedirectResponse
     {
+        if (! auth()->user()->isAdmin()) {
+            abort(403, 'Akses ditolak. Pengelolaan divisi hanya diizinkan untuk Administrator SDM / IT.');
+        }
+
         $validated = $request->validate([
             'name' => [
                 'required',

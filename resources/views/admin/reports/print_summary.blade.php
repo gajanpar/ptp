@@ -159,7 +159,25 @@
     </style>
 </head>
 <body>
-    <button class="no-print" onclick="window.print()">Cetak / Simpan PDF</button>
+    <div class="no-print print-toolbar" style="position: fixed; top: 16px; right: 16px; display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(203, 213, 225, 0.8); box-shadow: 0 4px 16px rgba(0, 34, 59, 0.15); z-index: 9999;">
+        @if(($action ?? '') === 'save_pdf')
+            <span style="font-size: 11px; color: #475569; margin-right: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                Pilih tujuan "Save as PDF" pada dialog cetak
+            </span>
+        @endif
+        <button type="button" onclick="window.print()" style="background: #005b9f; color: #ffffff; border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Cetak (Print)
+        </button>
+        <button type="button" onclick="window.print()" style="background: #dc2626; color: #ffffff; border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Simpan PDF
+        </button>
+        <button type="button" onclick="window.close()" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 7px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
+            Tutup
+        </button>
+    </div>
 
     <!-- Kop Surat Pelindo -->
     <div class="header-kop">
@@ -280,6 +298,14 @@
         <div style="margin-top: 20px; font-size: 8.5px; color: #64748b; font-style: italic; border-top: 1px dashed #cbd5e1; padding-top: 6px; text-align: center;">
             {{ $branchSettings['document_footer_note'] }}
         </div>
+    @endif
+
+    @if(($action ?? '') === 'print')
+        <script>
+            window.addEventListener('DOMContentLoaded', function() {
+                window.print();
+            });
+        </script>
     @endif
 </body>
 </html>

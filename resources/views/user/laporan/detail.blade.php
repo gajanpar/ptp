@@ -11,10 +11,17 @@
            style="background: #f1f5f9; color: #475569; text-decoration: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; border: 1px solid #cbd5e1;">
             &larr; Kembali
         </a>
-        <a href="{{ route('laporan.print', ['id' => $evaluation->id]) }}" target="_blank"
-           style="background: #0072CE; color: #ffffff; text-decoration: none; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            <span>Cetak Dokumen Resmi</span>
+        <a href="{{ route('laporan.print', ['id' => $evaluation->id, 'action' => 'save_pdf']) }}" target="_blank"
+           style="background: #dc2626; color: #ffffff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(220, 38, 38, 0.2);"
+           title="Simpan lembar hasil penilaian sebagai PDF">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <span>Simpan PDF</span>
+        </a>
+        <a href="{{ route('laporan.print', ['id' => $evaluation->id, 'action' => 'print']) }}" target="_blank"
+           style="background: #005b9f; color: #ffffff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0, 91, 159, 0.2);"
+           title="Buka dialog cetak dokumen resmi langsung">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            <span>Cetak (Print)</span>
         </a>
     </div>
 </div>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Division;
 use App\Models\PeriodManagement;
+use App\Services\EvaluationScoringService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -31,11 +32,7 @@ class PeriodController extends Controller
             ->get()
             ->groupBy('division_id');
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         // Buat matriks status [division_id][month] => 'open' | 'closed'
         $matrix = [];
@@ -119,11 +116,7 @@ class PeriodController extends Controller
         );
 
         $division = Division::find($divisionId);
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
         $monthName = $monthNames[$month] ?? "Bulan $month";
         $statusLabel = $newStatus === 'open' ? 'DIBUKA' : 'DITUTUP';
 
@@ -176,11 +169,7 @@ class PeriodController extends Controller
             );
         }
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
         $monthName = $monthNames[$month] ?? "Bulan $month";
         $statusLabel = ($status === 'open') ? 'DIBUKA SERENTAK' : 'DITUTUP SERENTAK';
 

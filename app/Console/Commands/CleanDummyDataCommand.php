@@ -78,6 +78,10 @@ class CleanDummyDataCommand extends Command
         $this->info('Memulai pembersihan data transaksi dummy secara aman...');
 
         DB::transaction(function () {
+            $purgedEvaluations = Evaluation::count();
+            $purgedDetails = EvaluationDetail::count();
+            $purgedEditRequests = EditRequest::count();
+
             // Hapus detail rincian penilaian
             EvaluationDetail::query()->delete();
 
@@ -94,8 +98,9 @@ class CleanDummyDataCommand extends Command
                 'System',
                 null,
                 [
-                    'purged_evaluations' => Evaluation::count(),
-                    'purged_details' => EvaluationDetail::count(),
+                    'purged_evaluations' => $purgedEvaluations,
+                    'purged_details' => $purgedDetails,
+                    'purged_edit_requests' => $purgedEditRequests,
                     'executed_at' => now()->toIso8601String(),
                 ]
             );

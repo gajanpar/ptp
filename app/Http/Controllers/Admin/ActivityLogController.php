@@ -55,11 +55,19 @@ class ActivityLogController extends Controller
             'system' => 'Otomasi Sistem / Scheduler',
         ];
 
+        $stats = ActivityLog::selectRaw(
+            'COUNT(*) as total, '
+            .'SUM(CASE WHEN DATE(created_at) = ? THEN 1 ELSE 0 END) as today, '
+            ."SUM(CASE WHEN action LIKE 'period%' THEN 1 ELSE 0 END) as period, "
+            ."SUM(CASE WHEN action LIKE 'edit_request%' THEN 1 ELSE 0 END) as requests",
+            [today()->toDateString()]
+        )->first();
+
         $counts = [
-            'total' => ActivityLog::count(),
-            'today' => ActivityLog::whereDate('created_at', today())->count(),
-            'period' => ActivityLog::where('action', 'like', 'period%')->count(),
-            'requests' => ActivityLog::where('action', 'like', 'edit_request%')->count(),
+            'total' => (int) $stats->total,
+            'today' => (int) $stats->today,
+            'period' => (int) $stats->period,
+            'requests' => (int) $stats->requests,
         ];
 
         return view('admin.activity_logs.index', [

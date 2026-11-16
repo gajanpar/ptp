@@ -14,10 +14,14 @@ class EditRequestController extends Controller
         $user = Auth::user();
         $divisionId = $user->division_id;
 
+        if (! $divisionId) {
+            return back()->with('error', 'Akun Administrator tidak terikat pada satu divisi; gunakan menu Manajemen Periode untuk membuka akses divisi secara langsung.');
+        }
+
         $request->validate([
             'month' => 'required|integer|between:1,12',
-            'year' => 'required|integer',
-            'reason' => 'nullable|string',
+            'year' => 'required|integer|between:2020,2100',
+            'reason' => 'nullable|string|max:1000',
         ]);
 
         $month = (int) $request->month;
@@ -56,11 +60,16 @@ class EditRequestController extends Controller
         $request->validate([
             'employee_id' => 'required|exists:employees,id',
             'month' => 'required|integer|between:1,12',
-            'year' => 'required|integer',
-            'reason' => 'nullable|string',
+            'year' => 'required|integer|between:2020,2035',
+            'reason' => 'nullable|string|max:1000',
         ]);
 
         $emp = Employee::findOrFail($request->employee_id);
+
+        // BOLA/IDOR prevention: a Kepala Divisi may only request edits for their own division's personnel.
+        if ($divisionId !== null && (int) $emp->division_id !== (int) $divisionId) {
+            abort(403, 'Akses ditolak. Anda hanya dapat mengajukan permohonan edit untuk personel divisi Anda sendiri.');
+        }
 
         $existing = EditRequest::where('employee_id', $emp->id)
             ->where('period_month', $request->month)
@@ -76,7 +85,7 @@ class EditRequestController extends Controller
         EditRequest::create([
             'request_type' => 'individual_edit',
             'employee_id' => $emp->id,
-            'division_id' => $divisionId,
+            'division_id' => $emp->division_id,
             'requested_by' => $user->id,
             'period_month' => (int) $request->month,
             'period_year' => (int) $request->year,

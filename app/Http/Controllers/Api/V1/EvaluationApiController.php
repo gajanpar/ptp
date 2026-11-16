@@ -163,59 +163,15 @@ class EvaluationApiController extends ApiController
             return $this->jsonError('Penilaian periode ini sedang terkunci (SLA Gembok Aktif). Diperlukan persetujuan pengajuan buka akses dari Admin SDM.', 423);
         }
 
-        // Validate all 17 subcategories are present
-        $totalSubcategories = EvaluationSubcategory::count();
-        if (count($ratings) !== $totalSubcategories) {
-            return $this->jsonError("Seluruh {$totalSubcategories} butir rubrik penilaian AKHLAK harus dinilai lengkap.", 422);
+        // Validate all 17 subcategories exist and are present
+        $subcategories = EvaluationSubcategory::all()->keyBy('id');
+        $totalSubcategories = $subcategories->count();
+        if (count($ratings) !== $totalSubcategories || array_diff(array_keys($ratings), $subcategories->keys()->all()) !== []) {
+            return $this->jsonError("Seluruh {$totalSubcategories} butir rubrik penilaian AKHLAK harus dinilai dengan ID subkategori yang valid.", 422);
         }
 
-        // Calculate score
-        $calc = EvaluationScoringService::calculate($ratings);
-
-        // DB Transaction
-        $evaluation = DB::transaction(function () use ($employee, $user, $divisionId, $month, $year, $calc, $ratings, $reasons) {
-            $eval = Evaluation::updateOrCreate([
-                'employee_id' => $employee->id,
-                'period_month' => $month,
-                'period_year' => $year,
-            ], [
-                'user_id' => $user->id,
-                'division_id' => $divisionId,
-                'total_score' => $calc['total_score'],
-                'average_score' => $calc['average_score'],
-                'predicate' => $calc['predicate'],
-                'status' => 'submitted',
-                'submitted_at' => now(),
-            ]);
-
-            EvaluationDetail::where('evaluation_id', $eval->id)->delete();
-
-            $subcategories = EvaluationSubcategory::all()->keyBy('id');
-            foreach ($ratings as $subId => $rating) {
-                $sub = $subcategories[$subId] ?? null;
-                if (! $sub) {
-                    continue;
-                }
-
-                $score = EvaluationScoringService::getRatingScore((int) $rating);
-                EvaluationDetail::create([
-                    'evaluation_id' => $eval->id,
-                    'subcategory_id' => $subId,
-                    'rating' => (int) $rating,
-                    'score' => $score,
-                    'reason' => $reasons[$subId] ?? null,
-                ]);
-            }
-
-            // Close any approved edit request
-            EditRequest::where('employee_id', $employee->id)
-                ->where('period_month', $month)
-                ->where('period_year', $year)
-                ->where('status', 'approved')
-                ->update(['status' => 'completed']);
-
-            return $eval;
-        });
+        // Persist evaluation atomically
+        [$evaluation, $calc] = $this->persistEvaluation($employee, $user, $month, $year, $ratings, $reasons, $subcategories);
 
         ActivityLog::log(
             'api_evaluation_submitted',
@@ -263,62 +219,72 @@ class EvaluationApiController extends ApiController
         $month = (int) $request->input('month');
         $year = (int) $request->input('year');
         $items = $request->input('evaluations');
-        $totalSubcategories = EvaluationSubcategory::count();
+        $subcategories = EvaluationSubcategory::all()->keyBy('id');
+        $validSubIds = $subcategories->keys()->all();
+        $totalSubcategories = $subcategories->count();
+        $isAdmin = $user->role === 'admin';
+
+        // Preload target employees to eliminate N+1 queries inside the batch loop
+        $employeeIds = collect($items)->pluck('employee_id')->map(fn ($id) => (int) $id)->unique()->all();
+        $employeesById = Employee::whereIn('id', $employeeIds)->get()->keyBy('id');
 
         $processed = [];
         $failed = [];
+        $openDivisionCache = [];
+        $divisionAccessCache = [];
 
         foreach ($items as $index => $item) {
             $empId = (int) $item['employee_id'];
             $ratings = $item['ratings'] ?? [];
-            $reasons = $item['reasons'] ?? [];
+            $reasons = is_array($item['reasons'] ?? null) ? $item['reasons'] : [];
 
-            $emp = Employee::find($empId);
+            $emp = $employeesById->get($empId);
             if (! $emp) {
                 $failed[] = ['index' => $index, 'employee_id' => $empId, 'reason' => 'Karyawan tidak ditemukan.'];
+
                 continue;
             }
 
-            if ($user->role !== 'admin' && $user->division_id && $emp->division_id !== $user->division_id) {
+            if (! $isAdmin && $user->division_id && (int) $emp->division_id !== (int) $user->division_id) {
                 $failed[] = ['index' => $index, 'employee_id' => $empId, 'name' => $emp->name, 'reason' => 'Tidak memiliki otoritas divisi.'];
+
                 continue;
             }
 
-            if (count($ratings) !== $totalSubcategories) {
-                $failed[] = ['index' => $index, 'employee_id' => $empId, 'name' => $emp->name, 'reason' => "Butir penilaian tidak lengkap ({$totalSubcategories} butir wajib diisi)."];
+            // Enforce SLA period lock unless admin or approved edit/access request exists
+            $divId = (int) $emp->division_id;
+            if (! array_key_exists($divId, $openDivisionCache)) {
+                $openDivisionCache[$divId] = PeriodManagement::isOpen($divId, $month, $year);
+                $divisionAccessCache[$divId] = EditRequest::where('division_id', $divId)
+                    ->where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->where('request_type', 'division_access')
+                    ->where('status', 'approved')
+                    ->exists();
+            }
+
+            $hasIndividualEdit = ! $isAdmin && ! $openDivisionCache[$divId] && ! $divisionAccessCache[$divId]
+                ? EditRequest::where('employee_id', $emp->id)
+                    ->where('period_month', $month)
+                    ->where('period_year', $year)
+                    ->where('request_type', 'individual_edit')
+                    ->where('status', 'approved')
+                    ->exists()
+                : false;
+
+            if (! $isAdmin && ! $openDivisionCache[$divId] && ! $divisionAccessCache[$divId] && ! $hasIndividualEdit) {
+                $failed[] = ['index' => $index, 'employee_id' => $empId, 'name' => $emp->name, 'reason' => 'Periode penilaian terkunci (SLA Gembok Aktif).'];
+
                 continue;
             }
 
-            $calc = EvaluationScoringService::calculate($ratings);
+            if (count($ratings) !== $totalSubcategories || array_diff(array_keys($ratings), $validSubIds) !== []) {
+                $failed[] = ['index' => $index, 'employee_id' => $empId, 'name' => $emp->name, 'reason' => "Butir penilaian tidak lengkap atau ID subkategori tidak valid ({$totalSubcategories} butir wajib diisi)."];
 
-            DB::transaction(function () use ($emp, $user, $month, $year, $calc, $ratings, $reasons) {
-                $eval = Evaluation::updateOrCreate([
-                    'employee_id' => $emp->id,
-                    'period_month' => $month,
-                    'period_year' => $year,
-                ], [
-                    'user_id' => $user->id,
-                    'division_id' => $emp->division_id,
-                    'total_score' => $calc['total_score'],
-                    'average_score' => $calc['average_score'],
-                    'predicate' => $calc['predicate'],
-                    'status' => 'submitted',
-                    'submitted_at' => now(),
-                ]);
+                continue;
+            }
 
-                EvaluationDetail::where('evaluation_id', $eval->id)->delete();
-
-                foreach ($ratings as $subId => $rating) {
-                    $score = EvaluationScoringService::getRatingScore((int) $rating);
-                    EvaluationDetail::create([
-                        'evaluation_id' => $eval->id,
-                        'subcategory_id' => $subId,
-                        'rating' => (int) $rating,
-                        'score' => $score,
-                        'reason' => $reasons[$subId] ?? null,
-                    ]);
-                }
-            });
+            [, $calc] = $this->persistEvaluation($emp, $user, $month, $year, $ratings, $reasons, $subcategories);
 
             $processed[] = [
                 'employee_id' => $emp->id,
@@ -345,5 +311,68 @@ class EvaluationApiController extends ApiController
             'processed' => $processed,
             'failed' => $failed,
         ], 'Batch penilaian berhasil diproses.');
+    }
+
+    /**
+     * Persist an evaluation header, its 17 detail rows, and complete any approved edit requests.
+     *
+     * @return array{0: Evaluation, 1: array}
+     */
+    private function persistEvaluation(
+        Employee $employee,
+        $user,
+        int $month,
+        int $year,
+        array $ratings,
+        array $reasons,
+        $subcategories
+    ): array {
+        $calc = EvaluationScoringService::calculate($ratings);
+
+        $evaluation = DB::transaction(function () use ($employee, $user, $month, $year, $calc, $ratings, $reasons, $subcategories) {
+            $eval = Evaluation::updateOrCreate([
+                'employee_id' => $employee->id,
+                'period_month' => $month,
+                'period_year' => $year,
+            ], [
+                'user_id' => $user->id,
+                'division_id' => $employee->division_id,
+                'total_score' => $calc['total_score'],
+                'average_score' => $calc['average_score'],
+                'predicate' => $calc['predicate'],
+                'status' => 'submitted',
+                'submitted_at' => now(),
+            ]);
+
+            EvaluationDetail::where('evaluation_id', $eval->id)->delete();
+
+            foreach ($ratings as $subId => $rating) {
+                if (! $subcategories->has($subId)) {
+                    continue;
+                }
+
+                $reasonText = isset($reasons[$subId]) && is_string($reasons[$subId])
+                    ? mb_substr(trim($reasons[$subId]), 0, 500)
+                    : null;
+
+                EvaluationDetail::create([
+                    'evaluation_id' => $eval->id,
+                    'subcategory_id' => (int) $subId,
+                    'rating' => (int) $rating,
+                    'score' => EvaluationScoringService::getRatingScore((int) $rating),
+                    'reason' => $reasonText,
+                ]);
+            }
+
+            EditRequest::where('employee_id', $employee->id)
+                ->where('period_month', $month)
+                ->where('period_year', $year)
+                ->where('status', 'approved')
+                ->update(['status' => 'completed']);
+
+            return $eval;
+        });
+
+        return [$evaluation, $calc];
     }
 }

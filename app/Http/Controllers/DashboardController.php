@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Division;
 use App\Models\Employee;
 use App\Models\Evaluation;
-use App\Models\EvaluationCategory;
-use App\Models\EvaluationDetail;
 use App\Models\PeriodManagement;
+use App\Services\EvaluationScoringService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -18,79 +18,115 @@ class DashboardController extends Controller
         $user = Auth::user();
         $divisionId = $user->division_id;
 
-        $month = (int) $request->get('month', 5);
-        $year = (int) $request->get('year', 2026);
+        $defaultMonth = (int) date('n');
+        $defaultYear = (int) date('Y');
 
-        // Karyawan di divisi penilai
-        $employeesQuery = Employee::where('is_active', true);
-        if ($divisionId) {
-            $employeesQuery->where('division_id', $divisionId);
+        $month = (int) $request->get('month', $defaultMonth);
+        $year = (int) $request->get('year', $defaultYear);
+        if ($month < 1 || $month > 12) {
+            $month = $defaultMonth;
         }
-        $totalEmployees = $employeesQuery->count();
-
-        // Karyawan yang sudah dinilai pada periode terpilih
-        $evaluationsQuery = Evaluation::with(['employee.division'])
-            ->where('period_month', $month)
-            ->where('period_year', $year);
-
-        if ($divisionId) {
-            $evaluationsQuery->where('division_id', $divisionId);
+        if ($year < 2020 || $year > 2035) {
+            $year = $defaultYear;
         }
 
-        $evaluations = $evaluationsQuery->get();
-        $evaluatedEmployeeIds = $evaluations->pluck('employee_id')->toArray();
-        $totalEvaluated = count(array_unique($evaluatedEmployeeIds));
+        $prevMonth = $month == 1 ? 12 : $month - 1;
+        $prevYear = $month == 1 ? $year - 1 : $year;
+
+        // 1. Load Division with period_status subquery (1 query) & bind to user to prevent lazy loading
+        $division = null;
+        $periodStatus = 'closed';
+        if ($divisionId) {
+            $division = Division::select('divisions.*')
+                ->addSelect([
+                    'period_status' => PeriodManagement::select('status')
+                        ->whereColumn('period_management.division_id', 'divisions.id')
+                        ->where('period_month', $month)
+                        ->where('period_year', $year)
+                        ->limit(1),
+                ])->find($divisionId);
+
+            if ($division) {
+                $user->setRelation('division', $division);
+                if ($division->period_status !== null) {
+                    $periodStatus = $division->period_status;
+                } else {
+                    $currentMonth = (int) date('n');
+                    $currentYear = (int) date('Y');
+                    $periodStatus = ($month === $currentMonth && $year === $currentYear) ? 'open' : 'closed';
+                }
+            }
+        } else {
+            $periodStatus = 'open';
+            $user->setRelation('division', null);
+        }
+
+        // 2. Consolidated Evaluations for current and previous month (1 query)
+        $evaluations = Evaluation::where(function ($q) use ($month, $year, $prevMonth, $prevYear) {
+            $q->where(function ($sub) use ($month, $year) {
+                $sub->where('period_month', $month)->where('period_year', $year);
+            })->orWhere(function ($sub) use ($prevMonth, $prevYear) {
+                $sub->where('period_month', $prevMonth)->where('period_year', $prevYear);
+            });
+        })
+            ->when($divisionId, fn ($q) => $q->where('division_id', $divisionId))
+            ->get();
+
+        $currentEvaluations = $evaluations->filter(fn ($e) => (int) $e->period_month === $month && (int) $e->period_year === $year)->values();
+        $prevEvaluations = $evaluations->filter(fn ($e) => (int) $e->period_month === $prevMonth && (int) $e->period_year === $prevYear);
+
+        $evaluatedEmployeeIds = $currentEvaluations->pluck('employee_id')->filter()->unique()->toArray();
+        $totalEvaluated = count($evaluatedEmployeeIds);
+
+        // 3. Consolidated Employees in division: active + any currently evaluated (1 query)
+        $employeesQuery = Employee::query();
+        if ($divisionId) {
+            $employeesQuery->where('division_id', $divisionId)
+                ->where(function ($q) use ($evaluatedEmployeeIds) {
+                    $q->where('is_active', true);
+                    if (! empty($evaluatedEmployeeIds)) {
+                        $q->orWhereIn('id', $evaluatedEmployeeIds);
+                    }
+                });
+        } else {
+            $employeesQuery->where('is_active', true);
+        }
+        $divisionEmployees = $employeesQuery->orderBy('name', 'asc')->get();
+        $employeesById = $divisionEmployees->keyBy('id');
+
+        $totalEmployees = $divisionEmployees->where('is_active', true)->count();
         $totalPending = max(0, $totalEmployees - $totalEvaluated);
 
         $progressPercentage = $totalEmployees > 0
             ? round(($totalEvaluated / $totalEmployees) * 100)
             : 0;
 
-        $periodStatus = $divisionId
-            ? PeriodManagement::getStatus($divisionId, $month, $year)
-            : 'open';
-
         $systemStatus = $progressPercentage >= 100 ? 'Selesai' : 'Dalam Proses';
         if ($periodStatus === 'closed') {
             $systemStatus = 'Periode Ditutup';
         }
 
-        // Rata-rata skor divisi
-        $averageScore = $totalEvaluated > 0 ? round($evaluations->avg('total_score'), 1) : 0;
+        // Bind employee relation in memory to prevent lazy-loading or extra eager queries
+        foreach ($currentEvaluations as $eval) {
+            $eval->setRelation('employee', $employeesById->get($eval->employee_id));
+        }
 
-        // Distribusi predikat di divisi ini
+        $averageScore = $totalEvaluated > 0 ? round($currentEvaluations->avg('total_score'), 1) : 0;
+
         $predicateCounts = [
-            'Sangat Baik' => $evaluations->where('predicate', 'Sangat Baik')->count(),
-            'Baik' => $evaluations->where('predicate', 'Baik')->count(),
-            'Cukup Baik' => $evaluations->where('predicate', 'Cukup Baik')->count(),
-            'Perlu Perhatian' => $evaluations->where('predicate', 'Perlu Perhatian')->count(),
+            'Sangat Baik' => $currentEvaluations->where('predicate', 'Sangat Baik')->count(),
+            'Baik' => $currentEvaluations->where('predicate', 'Baik')->count(),
+            'Cukup Baik' => $currentEvaluations->where('predicate', 'Cukup Baik')->count(),
+            'Perlu Perhatian' => $currentEvaluations->where('predicate', 'Perlu Perhatian')->count(),
         ];
 
-        // 1. Diagnostik 6 Nilai Inti AKHLAK Divisi Ini
-        $evalIds = $evaluations->pluck('id');
-        $akhlakStats = [];
-        $akhlakCategories = EvaluationCategory::whereIn('name', ['Amanah', 'Kompeten', 'Harmonis', 'Loyal', 'Adaptif', 'Kolaboratif'])
-            ->with('subcategories')
-            ->orderBy('order_index')
-            ->get();
-
-        foreach ($akhlakCategories as $cat) {
-            $subIds = $cat->subcategories->pluck('id');
-            $avgScore = $evalIds->isNotEmpty()
-                ? EvaluationDetail::whereIn('evaluation_id', $evalIds)->whereIn('subcategory_id', $subIds)->avg('score')
-                : null;
-
-            $normalizedScore = $avgScore ? round(($avgScore / 5.88) * 100, 1) : 0;
-            $akhlakStats[$cat->name] = [
-                'name' => $cat->name,
-                'raw_avg' => $avgScore ? round((float)$avgScore, 2) : 0,
-                'score_100' => $normalizedScore,
-            ];
-        }
+        // 4. AKHLAK Category Diagnostics (1 grouped query via shared service)
+        $evalIds = $currentEvaluations->pluck('id');
+        $akhlakStats = EvaluationScoringService::computeAkhlakStats($evalIds);
 
         $weakestPillar = null;
         $strongestPillar = null;
-        if ($totalEvaluated > 0 && !empty($akhlakStats)) {
+        if ($totalEvaluated > 0 && ! empty($akhlakStats)) {
             $scores = array_column($akhlakStats, 'score_100', 'name');
             asort($scores);
             $weakestPillar = [
@@ -103,54 +139,38 @@ class DashboardController extends Controller
             ];
         }
 
-        // 2. Top & Bottom Performers di Divisi Ini
-        $topPerformers = $evaluations->sortByDesc('total_score')->take(5)->values();
-        $bottomPerformers = $evaluations->sortBy('total_score')->take(5)->values();
+        $topPerformers = $currentEvaluations->sortByDesc('total_score')->take(5)->values();
+        $bottomPerformers = $currentEvaluations->sortBy('total_score')->take(5)->values();
 
-        // 3. Countdown SLA Gembok (Pengingat Tegas Penilai)
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
-        $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59);
+        try {
+            $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59);
+        } catch (\Throwable $e) {
+            $cutoffDate = Carbon::now()->endOfMonth();
+        }
         $now = Carbon::now();
         $isCutoffPassed = $now->greaterThan($cutoffDate);
         $slaDaysRemaining = $isCutoffPassed ? 0 : max(0, (int) $now->diffInDays($cutoffDate, false));
 
-        // 5. Tren Nilai Antar-Bulan Divisi (MoM)
-        $prevMonth = $month == 1 ? 12 : $month - 1;
-        $prevYear = $month == 1 ? $year - 1 : $year;
-        $prevDivQuery = Evaluation::where('period_month', $prevMonth)->where('period_year', $prevYear);
-        if ($divisionId) {
-            $prevDivQuery->where('division_id', $divisionId);
-        }
-        $prevDivAvg = $prevDivQuery->avg('total_score');
-
+        // MoM Previous Month Delta (Calculated in-memory from query #2)
+        $prevDivAvg = $prevEvaluations->isNotEmpty() ? $prevEvaluations->avg('total_score') : null;
         $momDelta = ($averageScore > 0 && $prevDivAvg) ? round($averageScore - $prevDivAvg, 1) : null;
         $prevMonthName = $monthNames[$prevMonth] ?? '-';
 
-        // Antrian Prioritas TAD yang Belum Dinilai
-        $pendingEmployees = Employee::where('is_active', true)
-            ->when($divisionId, fn($q) => $q->where('division_id', $divisionId))
+        // Pending Employees (Bounded in-memory from query #3)
+        $pendingEmployees = $divisionEmployees
+            ->where('is_active', true)
             ->whereNotIn('id', $evaluatedEmployeeIds)
-            ->orderBy('name', 'asc')
+            ->sortBy('name')
             ->take(5)
-            ->get();
+            ->values();
 
-        // Evaluasi Terbaru yang telah selesai
-        $recentEvaluated = Evaluation::with('employee')
-            ->where('period_month', $month)
-            ->where('period_year', $year)
-            ->when($divisionId, fn($q) => $q->where('division_id', $divisionId))
-            ->orderBy('updated_at', 'desc')
-            ->take(5)
-            ->get();
+        $recentEvaluated = $currentEvaluations->sortByDesc('updated_at')->take(5)->values();
 
         return view('user.dashboard', [
             'user' => $user,
-            'division' => $user->division,
+            'division' => $division,
             'month' => $month,
             'year' => $year,
             'monthName' => $monthNames[$month] ?? '-',
@@ -165,13 +185,12 @@ class DashboardController extends Controller
             'pendingEmployees' => $pendingEmployees,
             'recentEvaluated' => $recentEvaluated,
 
-            // Data Matriks Baru
             'akhlakStats' => $akhlakStats,
             'weakestPillar' => $weakestPillar,
             'strongestPillar' => $strongestPillar,
             'topPerformers' => $topPerformers,
             'bottomPerformers' => $bottomPerformers,
-            'slaCutoffDate' => '25 ' . ($monthNames[$month] ?? '-') . ' ' . $year . ', 23:59 WIB',
+            'slaCutoffDate' => '25 '.($monthNames[$month] ?? '-').' '.$year.', 23:59 WIB',
             'slaDaysRemaining' => $slaDaysRemaining,
             'isCutoffPassed' => $isCutoffPassed,
             'momDelta' => $momDelta,

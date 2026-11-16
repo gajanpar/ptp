@@ -5,9 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\Division;
 use App\Models\Employee;
 use App\Models\Evaluation;
-use App\Models\EvaluationCategory;
-use App\Models\EvaluationDetail;
-use Carbon\Carbon;
+use App\Services\EvaluationScoringService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -27,10 +25,14 @@ class DashboardApiController extends ApiController
         if ($month < 1 || $month > 12) {
             $month = (int) date('n');
         }
+        if ($year < 2020 || $year > 2100) {
+            $year = (int) date('Y');
+        }
 
         // Division scoping (non-admin locked to own division)
+        $rawDivId = $request->input('division_id');
         $divisionId = $isAdmin
-            ? ($request->filled('division_id') && $request->input('division_id') !== 'all' ? (int) $request->input('division_id') : null)
+            ? ($request->filled('division_id') && $rawDivId !== 'all' && is_numeric($rawDivId) ? (int) $rawDivId : null)
             : $user->division_id;
 
         // Employees query
@@ -58,25 +60,14 @@ class DashboardApiController extends ApiController
         $maxScore = $totalEvaluated > 0 ? round($evaluations->max('total_score'), 2) : 0.0;
         $minScore = $totalEvaluated > 0 ? round($evaluations->min('total_score'), 2) : 0.0;
 
-        // 1. Diagnostik 6 Nilai Inti AKHLAK
-        $evalIds = $evaluations->pluck('id');
+        // 1. Diagnostik 6 Nilai Inti AKHLAK (single grouped SQL aggregate)
+        $rawStats = EvaluationScoringService::computeAkhlakStats($evaluations->pluck('id'));
         $akhlakStats = [];
-        $akhlakCategories = EvaluationCategory::whereIn('name', ['Amanah', 'Kompeten', 'Harmonis', 'Loyal', 'Adaptif', 'Kolaboratif'])
-            ->with('subcategories')
-            ->orderBy('order_index')
-            ->get();
-
-        foreach ($akhlakCategories as $cat) {
-            $subIds = $cat->subcategories->pluck('id');
-            $catAvg = $evalIds->isNotEmpty()
-                ? EvaluationDetail::whereIn('evaluation_id', $evalIds)->whereIn('subcategory_id', $subIds)->avg('score')
-                : null;
-
-            $score100 = $catAvg ? round(($catAvg / 5.88) * 100, 1) : 0.0;
-            $akhlakStats[$cat->name] = [
-                'name' => $cat->name,
-                'raw_score' => $catAvg ? round((float) $catAvg, 2) : 0.0,
-                'normalized_score' => $score100,
+        foreach ($rawStats as $pillarName => $stat) {
+            $akhlakStats[$pillarName] = [
+                'name' => $stat['name'],
+                'raw_score' => $stat['raw_avg'],
+                'normalized_score' => $stat['score_100'],
             ];
         }
 
@@ -97,7 +88,7 @@ class DashboardApiController extends ApiController
 
         // 2. Top & Bottom Performers (Top 5 for admin, Top 3 for evaluator)
         $talentLimit = $isAdmin ? 5 : 3;
-        $topPerformers = $evaluations->sortByDesc('total_score')->take($talentLimit)->values()->map(function ($ev) {
+        $formatPerformer = static function ($ev): array {
             return [
                 'employee_id' => $ev->employee_id,
                 'nik' => $ev->employee?->nik ?: '-',
@@ -108,20 +99,10 @@ class DashboardApiController extends ApiController
                 'total_score' => (float) $ev->total_score,
                 'predicate' => $ev->predicate,
             ];
-        });
+        };
 
-        $bottomPerformers = $evaluations->sortBy('total_score')->take($talentLimit)->values()->map(function ($ev) {
-            return [
-                'employee_id' => $ev->employee_id,
-                'nik' => $ev->employee?->nik ?: '-',
-                'name' => $ev->employee?->name,
-                'position' => $ev->employee?->position ?: '-',
-                'division' => $ev->employee?->division?->name ?: '-',
-                'vendor_name' => $ev->employee?->vendor_name ?: 'PT PDS',
-                'total_score' => (float) $ev->total_score,
-                'predicate' => $ev->predicate,
-            ];
-        });
+        $topPerformers = $evaluations->sortByDesc('total_score')->take($talentLimit)->values()->map($formatPerformer);
+        $bottomPerformers = $evaluations->sortBy('total_score')->take($talentLimit)->values()->map($formatPerformer);
 
         // 3. Rekomendasi Kontrak PDS (Khusus Admin / SDM)
         $contractRecommendations = null;

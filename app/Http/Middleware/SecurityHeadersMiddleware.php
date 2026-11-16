@@ -38,14 +38,15 @@ class SecurityHeadersMiddleware
 
         // Content Security Policy (Strict with allowed trusted assets)
         $cspPolicy = "default-src 'self'; "
-            . "script-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            . "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            . "font-src 'self' https://fonts.gstatic.com data:; "
-            . "img-src 'self' data: blob:; "
-            . "connect-src 'self'; "
-            . "frame-ancestors 'self'; "
-            . "base-uri 'self'; "
-            . "form-action 'self';";
+            ."script-src 'self' 'unsafe-inline'; "
+            ."style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            ."font-src 'self' https://fonts.gstatic.com data:; "
+            ."img-src 'self' data: blob:; "
+            ."object-src 'none'; "
+            ."connect-src 'self'; "
+            ."frame-ancestors 'self'; "
+            ."base-uri 'self'; "
+            ."form-action 'self';";
         $response->headers->set('Content-Security-Policy', $cspPolicy);
 
         // Remove server software/version disclosure headers

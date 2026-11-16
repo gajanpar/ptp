@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -146,7 +146,7 @@ class BackupService
                 'size' => $size,
                 'size_formatted' => $this->formatBytes($size),
                 'sha256' => hash_file('sha256', $file->getRealPath()),
-                'created_at' => \Carbon\Carbon::createFromTimestamp($mTime)->setTimezone('Asia/Jakarta')->format('d/m/Y H:i:s'),
+                'created_at' => Carbon::createFromTimestamp($mTime)->setTimezone('Asia/Jakarta')->format('d/m/Y H:i:s'),
                 'timestamp' => $mTime,
             ];
         }
@@ -223,7 +223,7 @@ class BackupService
     /**
      * Format raw byte count into human-readable string.
      */
-    protected function formatBytes(int $bytes, int $precision = 2): string
+    public static function formatBytes(int $bytes, int $precision = 2): string
     {
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         $bytes = max($bytes, 0);

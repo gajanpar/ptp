@@ -12,13 +12,19 @@ use Illuminate\View\View;
 class ProfileController extends Controller
 {
     /**
+     * The seeded onboarding password used to flag accounts that have not yet
+     * changed their credentials. Must stay in sync with the seeders.
+     */
+    public const DEFAULT_PASSWORD = 'password123';
+
+    /**
      * Display the authenticated user's profile and security settings.
      */
     public function index(): View
     {
         $user = Auth::user()->load('division');
         $layout = $user->role === 'admin' ? 'layouts.admin' : 'layouts.app';
-        $isDefaultPassword = Hash::check('password123', $user->password);
+        $isDefaultPassword = Hash::check(self::DEFAULT_PASSWORD, $user->password);
 
         return view('profile.index', [
             'user' => $user,

@@ -13,27 +13,20 @@
     RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
     # 2. Security Hardening: Block Direct Access to Sensitive Files and Directories
-    # Whitelist ACME SSL challenges and Laravel public directory assets
+    # Whitelist ACME SSL challenge verification paths
     RewriteCond %{REQUEST_URI} !^/\.well-known/
-    RewriteCond %{REQUEST_URI} !^/\.vscode/ptp/public/
     RewriteRule (^|/)\. - [F,L]
 
     # Block sensitive configuration, database, log, source control, and deployment files
     RewriteRule \.(env|sqlite|db|log|git|md|yml|yaml|json|lock|sh|bak|dist)$ - [F,L,NC]
 
     # Block internal application source code, configuration, and storage directories
-    RewriteRule (^|/)(\.vscode/ptp/)?(app|bootstrap|config|database|resources|routes|storage|tests|vendor) - [F,L,NC]
+    RewriteRule (^|/)(app|bootstrap|config|database|resources|routes|storage|tests|vendor) - [F,L,NC]
 
     # 3. Transparent Routing to Laravel Public Directory
-    # Case A: Standard Repository Root in Document Root (Application located at public/)
     RewriteCond %{DOCUMENT_ROOT}/public -d
     RewriteCond %{REQUEST_URI} !^/public/
     RewriteRule ^(.*)$ public/$1 [L,QSA]
-
-    # Case B: Nested Monorepo Root in Document Root (Application located at .vscode/ptp/public)
-    RewriteCond %{DOCUMENT_ROOT}/.vscode/ptp/public -d
-    RewriteCond %{REQUEST_URI} !^/\.vscode/ptp/public/
-    RewriteRule ^(.*)$ .vscode/ptp/public/$1 [L,QSA]
 </IfModule>
 
 # Disable Directory Browsing

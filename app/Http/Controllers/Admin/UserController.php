@@ -60,11 +60,19 @@ class UserController extends Controller
         $divisions = Division::orderBy('id')->get();
         $activeDivisions = $divisions->where('is_active', true)->values();
 
+        // Single aggregate query replaces four separate count queries (SQLite + PostgreSQL safe).
+        $countsRow = DB::table('users')->selectRaw(
+            'COUNT(*) as total, '
+            ."SUM(CASE WHEN role = 'admin' AND is_active THEN 1 ELSE 0 END) as admins, "
+            ."SUM(CASE WHEN role = 'kepala_divisi' AND is_active THEN 1 ELSE 0 END) as evaluators, "
+            .'SUM(CASE WHEN NOT is_active THEN 1 ELSE 0 END) as inactive'
+        )->first();
+
         $counts = [
-            'total' => User::count(),
-            'admins' => User::where('role', 'admin')->where('is_active', true)->count(),
-            'evaluators' => User::where('role', 'kepala_divisi')->where('is_active', true)->count(),
-            'inactive' => User::where('is_active', false)->count(),
+            'total' => (int) $countsRow->total,
+            'admins' => (int) $countsRow->admins,
+            'evaluators' => (int) $countsRow->evaluators,
+            'inactive' => (int) $countsRow->inactive,
         ];
 
         return view('admin.users.index', [

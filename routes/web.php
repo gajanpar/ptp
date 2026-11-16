@@ -51,6 +51,15 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
 });
 
+// Master Data Karyawan TAD (Accessible to Admin and Kepala Divisi)
+Route::middleware(['auth', 'can_manage_employees'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
+    Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
+    Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+    Route::post('/employees/{employee}/toggle-status', [EmployeeController::class, 'toggleStatus'])->name('employees.toggle-status');
+    Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
+});
+
 // Protected Admin Routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [App\Http\Controllers\Admin\DashboardController::class, 'index'])->name('dashboard');
@@ -65,13 +74,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/requests/{id}/approve', [App\Http\Controllers\Admin\EditRequestController::class, 'approve'])->name('requests.approve');
     Route::post('/requests/{id}/reject', [App\Http\Controllers\Admin\EditRequestController::class, 'reject'])->name('requests.reject');
 
-    // Master Data Karyawan TAD & Divisi
-    Route::get('/employees', [EmployeeController::class, 'index'])->name('employees.index');
-    Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store');
-    Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
-    Route::post('/employees/{employee}/toggle-status', [EmployeeController::class, 'toggleStatus'])->name('employees.toggle-status');
-    Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy');
-
+    // Master Divisi Operasional (Admin Only)
     Route::post('/divisions', [EmployeeController::class, 'storeDivision'])->name('divisions.store');
     Route::put('/divisions/{division}', [EmployeeController::class, 'updateDivision'])->name('divisions.update');
 
@@ -96,8 +99,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('/reports/print-summary', [ReportController::class, 'printSummary'])->name('reports.print-summary');
     Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
-    Route::get('/reports/{id}', [ReportController::class, 'show'])->name('reports.show');
-    Route::get('/reports/{id}/print', [ReportController::class, 'printSingle'])->name('reports.print-single');
+    Route::get('/reports/{id}', [ReportController::class, 'show'])->name('reports.show')->whereNumber('id');
+    Route::get('/reports/{id}/print', [ReportController::class, 'printSingle'])->name('reports.print-single')->whereNumber('id');
 
     // Audit Trail & Activity Logs
     Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');

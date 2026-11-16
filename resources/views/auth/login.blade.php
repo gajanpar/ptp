@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="{{ asset('assets/css/style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
     <style>
         body {
             margin: 0;
@@ -95,7 +96,7 @@
         .login-submit-btn {
             width: 100%;
             padding: 12px;
-            background: #005FA8;
+            background: var(--pelindo-blue-primary, #005b9f);
             color: #ffffff;
             border: none;
             border-radius: 8px;
@@ -103,12 +104,21 @@
             font-weight: 600;
             cursor: pointer;
             transition: background-color 0.2s ease;
-            box-shadow: 0 4px 6px -1px rgba(0, 95, 168, 0.25);
+            box-shadow: 0 4px 6px -1px rgba(0, 91, 159, 0.25);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
         @media (hover: hover) {
             .login-submit-btn:hover {
-                background: #004B87;
+                background: #004b82;
             }
+        }
+        .login-submit-btn:disabled {
+            opacity: 0.75;
+            cursor: not-allowed;
+            pointer-events: none;
         }
         @media (max-width: 768px) {
             .login-wrapper {
@@ -197,8 +207,9 @@
                     </div>
                 </div>
 
-                <button type="submit" class="login-submit-btn">
-                    Masuk
+                <button type="submit" id="loginSubmitBtn" class="login-submit-btn">
+                    <span id="loginBtnSpinner" class="spinner-border-sm" style="display: none;" aria-hidden="true"></span>
+                    <span id="loginBtnText">Masuk</span>
                 </button>
             </form>
 
@@ -210,6 +221,20 @@
     </main>
 
     <script>
+        document.querySelector('form').addEventListener('submit', function(e) {
+            var btn = document.getElementById('loginSubmitBtn');
+            var spinner = document.getElementById('loginBtnSpinner');
+            var text = document.getElementById('loginBtnText');
+            if (btn && !btn.disabled) {
+                // Ensure required fields are valid before disabling
+                if (this.checkValidity()) {
+                    btn.disabled = true;
+                    if (spinner) spinner.style.display = 'inline-block';
+                    if (text) text.textContent = 'Memverifikasi...';
+                }
+            }
+        });
+
         function togglePassword() {
             const input = document.getElementById('passwordInput');
             const btn = document.getElementById('togglePasswordBtn');

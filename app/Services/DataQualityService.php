@@ -2,15 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\Division;
-use App\Models\EditRequest;
 use App\Models\Employee;
 use App\Models\Evaluation;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationDetail;
 use App\Models\EvaluationSubcategory;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 
 /**
  * DataQualityService - Standar Audit Kualitas & Integritas Data Korporat SPKTAD
@@ -138,11 +135,12 @@ class DataQualityService
     {
         $rules = [];
 
-        // Rule 2.1: Duplikasi NIK Karyawan
-        $duplicateNiks = Employee::select('nik', DB::raw('count(*) as total'))
+        // Rule 2.1: Duplikasi NIK Karyawan (SQLite + PostgreSQL portable HAVING)
+        $duplicateNiks = Employee::select('nik')
             ->whereNotNull('nik')
             ->groupBy('nik')
-            ->having('total', '>', 1)
+            ->havingRaw('COUNT(*) > 1')
+            ->get()
             ->count();
         $rules[] = [
             'name' => 'TAD Employee NIK Uniqueness',
@@ -153,9 +151,10 @@ class DataQualityService
         ];
 
         // Rule 2.2: Duplikasi Username Pengguna
-        $duplicateUsernames = User::select('username', DB::raw('count(*) as total'))
+        $duplicateUsernames = User::select('username')
             ->groupBy('username')
-            ->having('total', '>', 1)
+            ->havingRaw('COUNT(*) > 1')
+            ->get()
             ->count();
         $rules[] = [
             'name' => 'User Account Username Uniqueness',
@@ -166,9 +165,10 @@ class DataQualityService
         ];
 
         // Rule 2.3: Duplikasi Evaluasi per Periode
-        $duplicateEvals = Evaluation::select('employee_id', 'period_month', 'period_year', DB::raw('count(*) as total'))
+        $duplicateEvals = Evaluation::select('employee_id', 'period_month', 'period_year')
             ->groupBy('employee_id', 'period_month', 'period_year')
-            ->having('total', '>', 1)
+            ->havingRaw('COUNT(*) > 1')
+            ->get()
             ->count();
         $rules[] = [
             'name' => 'Evaluation Record Uniqueness per Period',
@@ -234,7 +234,7 @@ class DataQualityService
         $rules = [];
 
         // Rule 4.1: Karyawan dengan Divisi Tidak Terdaftar
-        $orphanEmpDiv = Employee::whereNotIn('division_id', Division::pluck('id'))->count();
+        $orphanEmpDiv = Employee::whereDoesntHave('division')->count();
         $rules[] = [
             'name' => 'Employee to Division FK Integrity',
             'passed' => $orphanEmpDiv === 0,
@@ -244,7 +244,7 @@ class DataQualityService
         ];
 
         // Rule 4.2: Evaluasi tanpa Karyawan
-        $orphanEvals = Evaluation::whereNotIn('employee_id', Employee::pluck('id'))->count();
+        $orphanEvals = Evaluation::whereDoesntHave('employee')->count();
         $rules[] = [
             'name' => 'Evaluation to Employee FK Integrity',
             'passed' => $orphanEvals === 0,
@@ -254,7 +254,7 @@ class DataQualityService
         ];
 
         // Rule 4.3: Rincian Evaluasi tanpa Subkategori
-        $orphanDetails = EvaluationDetail::whereNotIn('subcategory_id', EvaluationSubcategory::pluck('id'))->count();
+        $orphanDetails = EvaluationDetail::whereDoesntHave('subcategory')->count();
         $rules[] = [
             'name' => 'Evaluation Detail to Rubrik Subcategory FK Integrity',
             'passed' => $orphanDetails === 0,
@@ -275,7 +275,7 @@ class DataQualityService
 
         $evaluationCount = Evaluation::count();
         $detailCount = EvaluationDetail::count();
-        $editRequestCount = EditRequest::count();
+        $activeEmpCount = Employee::where('is_active', true)->count();
 
         $rules[] = [
             'name' => 'Clean State Evaluation Count (Production Readiness)',
@@ -287,10 +287,10 @@ class DataQualityService
 
         $rules[] = [
             'name' => 'Active Employee Master Count',
-            'passed' => Employee::where('is_active', true)->count() >= 35,
+            'passed' => $activeEmpCount >= 35,
             'severity' => 'WARNING',
-            'count' => Employee::where('is_active', true)->count(),
-            'description' => 'Jumlah personel TAD aktif: '.Employee::where('is_active', true)->count().' (Standar cabang: 35 TAD).',
+            'count' => $activeEmpCount,
+            'description' => "Jumlah personel TAD aktif: {$activeEmpCount} (Standar cabang: 35 TAD).",
         ];
 
         return ['rules' => $rules];

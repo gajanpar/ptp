@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\Division;
 use App\Models\EditRequest;
 use App\Models\PeriodManagement;
+use App\Services\EvaluationScoringService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -51,11 +52,7 @@ class EditRequestController extends Controller
 
         $divisions = Division::where('is_active', true)->orderBy('name')->get();
 
-        $monthNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         return view('admin.edit_requests.index', [
             'requests' => $requests,

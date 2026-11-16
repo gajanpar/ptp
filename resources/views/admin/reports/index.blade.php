@@ -7,8 +7,8 @@
         <p style="font-size: 14px; color: #64748b; margin: 0;">Rekapitulasi komprehensif penilaian kinerja Tenaga Alih Daya tingkat Cabang Cirebon</p>
     </div>
 
-    <!-- Export & Print Actions -->
-    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <!-- Export & Print Actions (R2 Separated Actions) -->
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
         @php
             $exportParams = [
                 'period_type' => $periodType,
@@ -17,14 +17,40 @@
                 'division_id' => $divisionId,
             ];
         @endphp
-        <a href="{{ route('admin.reports.print-summary', $exportParams) }}" target="_blank" style="background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Cetak Rekap Resmi
+
+        <!-- 1. Download CSV -->
+        <a href="{{ route('admin.reports.export', array_merge($exportParams, ['format' => 'csv'])) }}"
+           onclick="triggerExportFeedback(this, 'Menyiapkan CSV...')"
+           style="background: #f0f9ff; color: #0284c7; border: 1px solid #bae6fd; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(2, 132, 199, 0.08);"
+           title="Unduh rekapitulasi data format CSV dengan UTF-8 BOM">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+            Download CSV
         </a>
 
-        <a href="{{ route('admin.reports.export', $exportParams) }}" style="background: #16a34a; color: #ffffff; border: none; padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download Excel / CSV
+        <!-- 2. Download Excel -->
+        <a href="{{ route('admin.reports.export', array_merge($exportParams, ['format' => 'excel'])) }}"
+           onclick="triggerExportFeedback(this, 'Menyiapkan Excel...')"
+           style="background: #16a34a; color: #ffffff; border: 1px solid #15803d; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);"
+           title="Unduh rekapitulasi format spreadsheet Microsoft Excel (.xls)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            Download Excel
+        </a>
+
+        <!-- 3. Simpan PDF -->
+        <a href="{{ route('admin.reports.print-summary', array_merge($exportParams, ['action' => 'save_pdf'])) }}" target="_blank"
+           onclick="triggerExportFeedback(this, 'Menyusun PDF...')"
+           style="background: #00223B; color: #ffffff; border: 1px solid #001728; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0, 34, 59, 0.2);"
+           title="Buka tampilan siap simpan PDF dengan format A4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="12 18 12 12"/><polyline points="9 15 12 18 15 15"/></svg>
+            Simpan PDF
+        </a>
+
+        <!-- 4. Cetak (Print) -->
+        <a href="{{ route('admin.reports.print-summary', array_merge($exportParams, ['action' => 'print'])) }}" target="_blank"
+           style="background: #0072CE; color: #ffffff; border: 1px solid #005FA8; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0, 114, 206, 0.2);"
+           title="Buka dialog cetak peramban langsung">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Cetak (Print)
         </a>
     </div>
 </div>
@@ -177,7 +203,7 @@
             </div>
         @else
             <div class="table-responsive">
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <table class="table-pelindo data-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
                     <thead>
                         <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 11px; text-transform: uppercase;">
                             <th style="padding: 13px 18px; text-align: center; width: 45px;">Rank</th>
@@ -216,13 +242,13 @@
                                 </td>
                                 <td style="padding: 13px 18px; text-align: center;">
                                     @if($eval->predicate === 'Sangat Baik')
-                                        <span style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Sangat Baik</span>
+                                        <span class="badge-predicate badge-predicate-sangat-baik" style="background: #dcfce7; color: #15803d; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Sangat Baik</span>
                                     @elseif($eval->predicate === 'Baik')
-                                        <span style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Baik</span>
+                                        <span class="badge-predicate badge-predicate-baik" style="background: #e0f2fe; color: #0369a1; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Baik</span>
                                     @elseif($eval->predicate === 'Cukup Baik')
-                                        <span style="background: #fef9c3; color: #a16207; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Cukup Baik</span>
+                                        <span class="badge-predicate badge-predicate-cukup" style="background: #fef9c3; color: #a16207; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Cukup Baik</span>
                                     @else
-                                        <span style="background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Perlu Perhatian</span>
+                                        <span class="badge-predicate badge-predicate-kurang" style="background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700;">Perlu Perhatian</span>
                                     @endif
                                 </td>
                                 <td style="padding: 13px 18px; color: #475569; font-size: 12px;">
@@ -285,7 +311,7 @@
         </div>
 
         <div class="table-responsive">
-            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <table class="table-pelindo data-table" style="width: 100%; border-collapse: collapse; font-size: 12px;">
                 <thead>
                     <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0; color: #475569; font-size: 11px; text-transform: uppercase;">
                         <th style="padding: 12px 14px; text-align: center; width: 40px;">No</th>
@@ -334,13 +360,13 @@
                             </td>
                             <td style="padding: 11px 14px; text-align: center;">
                                 @if($row['predicate'] === 'Sangat Baik')
-                                    <span style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Sangat Baik</span>
+                                    <span class="badge-predicate badge-predicate-sangat-baik" style="background: #dcfce7; color: #15803d; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Sangat Baik</span>
                                 @elseif($row['predicate'] === 'Baik')
-                                    <span style="background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Baik</span>
+                                    <span class="badge-predicate badge-predicate-baik" style="background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Baik</span>
                                 @elseif($row['predicate'] === 'Cukup Baik')
-                                    <span style="background: #fef9c3; color: #a16207; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Cukup Baik</span>
+                                    <span class="badge-predicate badge-predicate-cukup" style="background: #fef9c3; color: #a16207; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Cukup Baik</span>
                                 @elseif($row['predicate'] === 'Perlu Perhatian')
-                                    <span style="background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Perlu Perhatian</span>
+                                    <span class="badge-predicate badge-predicate-kurang" style="background: #fee2e2; color: #b91c1c; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700;">Perlu Perhatian</span>
                                 @else
                                     <span style="color: #94a3b8; font-style: italic;">Belum Ada</span>
                                 @endif
@@ -361,17 +387,21 @@
                 <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;" id="modalEmployeeName">Rincian Penilaian Karyawan</h3>
                 <p style="font-size: 12.5px; color: #64748b; margin: 2px 0 0 0;" id="modalEmployeeMeta">Detail 17 butir indikator perilaku AKHLAK</p>
             </div>
-            <button type="button" onclick="closeModalById('evaluationDetailModal')" style="background: none; border: none; font-size: 22px; color: #64748b; cursor: pointer;">&times;</button>
+            <button type="button" onclick="closeModalById('evaluationDetailModal')" aria-label="Tutup rincian penilaian" style="background: none; border: none; font-size: 22px; color: #64748b; cursor: pointer;"><span aria-hidden="true">&times;</span></button>
         </div>
 
         <div id="modalEvaluationContent" style="font-size: 13px;">
             <div style="text-align: center; padding: 30px; color: #64748b;">Memuat data...</div>
         </div>
 
-        <div class="modal-actions-sticky">
-            <a id="modalPrintBtn" href="#" target="_blank" style="background: #0072CE; color: #ffffff; padding: 8px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+        <div class="modal-actions-sticky" style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+            <a id="modalPdfBtn" href="#" target="_blank" style="background: #dc2626; color: #ffffff; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Simpan PDF
+            </a>
+            <a id="modalPrintBtn" href="#" target="_blank" style="background: #005b9f; color: #ffffff; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                Cetak Lembar Resmi
+                Cetak (Print)
             </a>
             <button type="button" onclick="closeModalById('evaluationDetailModal')" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">Tutup</button>
         </div>
@@ -394,11 +424,26 @@
         document.getElementById(id).classList.remove('active');
     }
 
+    function triggerExportFeedback(el, loadingLabel) {
+        if (!el || el.classList.contains('is-exporting')) return;
+        var originalHtml = el.innerHTML;
+        el.classList.add('is-exporting');
+        el.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display:inline-block; width:12px; height:12px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .75s linear infinite;"></span> ' + (loadingLabel || 'Menyiapkan...');
+        el.style.pointerEvents = 'none';
+        setTimeout(function() {
+            el.classList.remove('is-exporting');
+            el.innerHTML = originalHtml;
+            el.style.pointerEvents = '';
+        }, 3000);
+    }
+
     function showEvaluationDetail(evalId) {
         var modal = document.getElementById('evaluationDetailModal');
         var content = document.getElementById('modalEvaluationContent');
+        var pdfBtn = document.getElementById('modalPdfBtn');
         var printBtn = document.getElementById('modalPrintBtn');
-        printBtn.href = "{{ url('/admin/reports') }}/" + evalId + "/print";
+        if (pdfBtn) pdfBtn.href = "{{ url('/admin/reports') }}/" + evalId + "/print?action=save_pdf";
+        if (printBtn) printBtn.href = "{{ url('/admin/reports') }}/" + evalId + "/print?action=print";
 
         modal.classList.add('active');
         content.innerHTML = '<div style="text-align: center; padding: 30px; color: #64748b;">Memuat rincian penilaian...</div>';
@@ -406,11 +451,16 @@
         fetch("{{ url('/admin/reports') }}/" + evalId, {
             headers: { 'Accept': 'application/json' }
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
         .then(data => {
+            if (!data || !data.evaluation) throw new Error('Data tidak valid');
             var ev = data.evaluation;
-            document.getElementById('modalEmployeeName').textContent = ev.employee.name + ' (' + ev.employee.nik + ')';
-            document.getElementById('modalEmployeeMeta').textContent = ev.employee.position + ' • Divisi ' + (ev.employee.division ? ev.employee.division.name : '-') + ' • Periode: Bulan ' + ev.period_month + '/' + ev.period_year;
+            var emp = ev.employee || {};
+            document.getElementById('modalEmployeeName').textContent = (emp.name || 'Eks-Karyawan') + ' (' + (emp.nik || '-') + ')';
+            document.getElementById('modalEmployeeMeta').textContent = (emp.position || '-') + ' • Divisi ' + (emp.division ? emp.division.name : '-') + ' • Periode: Bulan ' + ev.period_month + '/' + ev.period_year;
 
             var html = '<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">'
                      + '<div><span style="font-size: 12px; color: #64748b;">Total Skor: </span><strong style="font-size: 18px; color: #0f172a;">' + parseFloat(ev.total_score).toFixed(2) + '</strong> • <span style="font-size: 12px; color: #64748b;">Predikat: </span><strong style="color: #0284c7;">' + escapeHtml(ev.predicate) + '</strong></div>'
@@ -428,12 +478,14 @@
             var itemCounter = 1;
             for (var catId in data.groupedDetails) {
                 var group = data.groupedDetails[catId];
-                html += '<tr style="background: #f8fafc; border-top: 2px solid #cbd5e1;"><td colspan="4" style="padding: 8px 12px; font-weight: 700; color: #00223B;">' + escapeHtml(group.category.name) + '</td></tr>';
+                var catName = group.category ? group.category.name : 'Kategori';
+                html += '<tr style="background: #f8fafc; border-top: 2px solid #cbd5e1;"><td colspan="4" style="padding: 8px 12px; font-weight: 700; color: #00223B;">' + escapeHtml(catName) + '</td></tr>';
 
                 group.items.forEach(function(item) {
+                    var subName = item.subcategory ? item.subcategory.name : 'Indikator';
                     html += '<tr style="border-bottom: 1px solid #f1f5f9;">'
-                          + '<td style="padding: 8px 12px; color: #334155;"><strong>#' + itemCounter + '.</strong> ' + escapeHtml(item.subcategory.name) + '</td>'
-                          + '<td style="padding: 8px 12px; text-align: center;"><span style="background: #e0f2fe; color: #0369a1; padding: 2px 7px; border-radius: 4px; font-weight: 700;">R' + item.rating + '</span></td>'
+                          + '<td style="padding: 8px 12px; color: #334155;"><strong>#' + itemCounter + '.</strong> ' + escapeHtml(subName) + '</td>'
+                          + '<td style="padding: 8px 12px; text-align: center;"><span style="background: #e0f2fe; color: #0369a1; padding: 2px 7px; border-radius: 4px; font-weight: 700;">R' + escapeHtml(item.rating) + '</span></td>'
                           + '<td style="padding: 8px 12px; text-align: end; font-weight: 700;">' + parseFloat(item.score).toFixed(2) + '</td>'
                           + '<td style="padding: 8px 12px; color: #64748b; font-size: 11.5px;">' + (item.reason ? escapeHtml(item.reason) : '-') + '</td>'
                           + '</tr>';
