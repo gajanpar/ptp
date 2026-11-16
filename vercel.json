@@ -39,7 +39,7 @@
         "VERCEL": "1",
         "APP_NAME": "SPKTAD Pelindo Cirebon",
         "APP_ENV": "production",
-        "APP_DEBUG": "true",
+        "APP_DEBUG": "false",
         "APP_KEY": "base64:fA3eoib3fK3pvs6TACojMNSSwg2TWvuJ892sQ3KuSCQ=",
         "APP_TIMEZONE": "Asia/Jakarta",
         "APP_LOCALE": "id",
