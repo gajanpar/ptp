@@ -21,35 +21,35 @@
         <!-- 1. Download CSV -->
         <a href="{{ route('admin.reports.export', array_merge($exportParams, ['format' => 'csv'])) }}"
            onclick="triggerExportFeedback(this, 'Menyiapkan CSV...')"
-           style="background: #f0f9ff; color: #0284c7; border: 1px solid #bae6fd; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(2, 132, 199, 0.08);"
+           class="spbe-btn-neutral"
            title="Unduh rekapitulasi data format CSV dengan UTF-8 BOM">
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
             Download CSV
         </a>
 
         <!-- 2. Download Excel -->
         <a href="{{ route('admin.reports.export', array_merge($exportParams, ['format' => 'excel'])) }}"
            onclick="triggerExportFeedback(this, 'Menyiapkan Excel...')"
-           style="background: #16a34a; color: #ffffff; border: 1px solid #15803d; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);"
+           class="spbe-btn-neutral"
            title="Unduh rekapitulasi format spreadsheet Microsoft Excel (.xls)">
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
             Download Excel
         </a>
 
         <!-- 3. Simpan PDF -->
         <a href="{{ route('admin.reports.print-summary', array_merge($exportParams, ['action' => 'save_pdf'])) }}" target="_blank"
            onclick="triggerExportFeedback(this, 'Menyusun PDF...')"
-           style="background: #00223B; color: #ffffff; border: 1px solid #001728; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0, 34, 59, 0.2);"
+           class="spbe-btn-neutral"
            title="Buka tampilan siap simpan PDF dengan format A4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="12 18 12 12"/><polyline points="9 15 12 18 15 15"/></svg>
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="12 18 12 12"/><polyline points="9 15 12 18 15 15"/></svg>
             Simpan PDF
         </a>
 
         <!-- 4. Cetak (Print) -->
         <a href="{{ route('admin.reports.print-summary', array_merge($exportParams, ['action' => 'print'])) }}" target="_blank"
-           style="background: #0072CE; color: #ffffff; border: 1px solid #005FA8; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 4px rgba(0, 114, 206, 0.2);"
+           class="spbe-btn-primary"
            title="Buka dialog cetak peramban langsung">
-            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Cetak (Print)
         </a>
     </div>
@@ -105,49 +105,53 @@
             </select>
         </div>
 
-        <button type="submit" style="background: #0072CE; color: #ffffff; border: none; padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+        <button type="submit" style="background: #00223B; color: #ffffff; border: none; padding: 7px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
             Tampilkan
         </button>
     </form>
 </div>
 
 @if($periodType === 'monthly')
-    <!-- Metric Cards Bulanan -->
+    <!-- Metric Cards Bulanan (Standar Nasional SPBE - Tanpa Kartu Skor Tertinggi) -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px;">
         <div class="card" style="background: #ffffff; padding: 18px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span class="kpi-label" title="Evaluasi Selesai" tabindex="0" style="font-size: 12.5px; font-weight: 600; color: #64748b;">Evaluasi Selesai</span>
-                <div style="width: 34px; height: 34px; border-radius: 8px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <div class="spbe-kpi-icon">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                 </div>
             </div>
-            <div style="font-size: 26px; font-weight: 800; color: #0f172a;">{{ $metrics['total_evaluated'] }} / {{ $metrics['target_employees'] }}</div>
-            <div style="font-size: 11.5px; color: #0284c7; margin-top: 2px;">{{ $metrics['completion_rate'] }}% Progres Pengisian</div>
+            <div style="font-size: 26px; font-weight: 800; color: #0f172a;" class="tabular-nums">{{ $metrics['total_evaluated'] }} / {{ $metrics['target_employees'] }}</div>
+            <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">{{ $metrics['completion_rate'] }}% Progres Pengisian</div>
         </div>
 
         <div class="card" style="background: #ffffff; padding: 18px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span class="kpi-label" title="Rata-Rata Skor Cabang" tabindex="0" style="font-size: 12.5px; font-weight: 600; color: #64748b;">Rata-Rata Skor Cabang</span>
-                <div style="width: 34px; height: 34px; border-radius: 8px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <div class="spbe-kpi-icon">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                 </div>
             </div>
-            <div style="font-size: 26px; font-weight: 800; color: #15803d;">{{ number_format($metrics['average_score'], 2) }}</div>
-            <div style="font-size: 11.5px; color: #16a34a; margin-top: 2px; font-weight: 600;">Predikat: {{ $metrics['branch_predicate'] }}</div>
+            <div style="font-size: 26px; font-weight: 800; color: #00223B;" class="tabular-nums">{{ number_format($metrics['average_score'], 2) }}</div>
+            <div style="font-size: 11.5px; color: #475569; margin-top: 2px; font-weight: 600;">Predikat: {{ $metrics['branch_predicate'] }}</div>
         </div>
 
+        @php
+            $activeDivCoverageCount = collect($divisionComparisons)->where('count', '>', 0)->count();
+            $totalDivCoverageCount = count($divisionComparisons);
+        @endphp
         <div class="card" style="background: #ffffff; padding: 18px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span class="kpi-label" title="Skor Tertinggi" tabindex="0" style="font-size: 12.5px; font-weight: 600; color: #64748b;">Skor Tertinggi</span>
-                <div style="width: 34px; height: 34px; border-radius: 8px; background: #fefce8; color: #a16207; display: flex; align-items: center; justify-content: center;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span class="kpi-label" title="Cakupan Divisi Aktif" tabindex="0" style="font-size: 12.5px; font-weight: 600; color: #64748b;">Cakupan Divisi Aktif</span>
+                <div class="spbe-kpi-icon">
+                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                 </div>
             </div>
-            <div style="font-size: 26px; font-weight: 800; color: #0f172a;">
-                {{ $metrics['highest'] ? number_format($metrics['highest']->total_score, 2) : '-' }}
+            <div style="font-size: 26px; font-weight: 800; color: #0f172a;" class="tabular-nums">
+                {{ $activeDivCoverageCount }} / {{ $totalDivCoverageCount }}
             </div>
-            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px; overflow-wrap: anywhere; line-height: 1.3;" title="{{ $metrics['highest'] ? $metrics['highest']->employee->name : '' }}">
-                {{ $metrics['highest'] ? $metrics['highest']->employee->name : 'Belum ada data' }}
+            <div style="font-size: 11.5px; color: #64748b; margin-top: 2px;">
+                Unit kerja telah mengisi evaluasi
             </div>
         </div>
 
@@ -173,10 +177,10 @@
         <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 12px 0;">Komparasi Nilai Rata-Rata Antar Divisi ({{ $currentMonthName }} {{ $year }})</h3>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
             @foreach($divisionComparisons as $divComp)
-                <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; background: #fafafa;">
+                <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; background: #f8fafc;">
                     <div style="font-size: 13px; font-weight: 700; color: #0f172a;">{{ $divComp['division']->name }}</div>
                     <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px;">
-                        <span style="font-size: 20px; font-weight: 800; color: #0284c7;">
+                        <span class="tabular-nums" style="font-size: 20px; font-weight: 800; color: #00223B;">
                             {{ $divComp['avg_score'] > 0 ? number_format($divComp['avg_score'], 2) : '-' }}
                         </span>
                         <span style="font-size: 11.5px; font-weight: 600; color: #64748b;">
@@ -220,10 +224,10 @@
                     <tbody>
                         @foreach($evaluations as $idx => $eval)
                             <tr style="border-bottom: 1px solid #f1f5f9;">
-                                <td style="padding: 13px 18px; text-align: center; font-weight: 800; color: {{ $idx < 3 ? '#d97706' : '#64748b' }};">
+                                <td style="padding: 13px 18px; text-align: center; font-weight: 700; color: #475569;">
                                     #{{ $idx + 1 }}
                                 </td>
-                                <td style="padding: 13px 18px; font-family: monospace; font-weight: 700; color: #0369a1;">
+                                <td style="padding: 13px 18px; font-family: monospace; font-weight: 700; color: #00223B;">
                                     {{ $eval->employee->nik }}
                                 </td>
                                 <td style="padding: 13px 18px; font-weight: 700; color: #0f172a;">
@@ -260,7 +264,7 @@
                                             <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                                         </a>
 
-                                        <button type="button" onclick="showEvaluationDetail({{ $eval->id }})" title="Lihat rincian 17 aspek" style="background: #eff6ff; color: #0284c7; border: 1px solid #bae6fd; padding: 5px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer;">
+                                        <button type="button" onclick="showEvaluationDetail({{ $eval->id }})" title="Lihat rincian 17 aspek" style="background: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; padding: 5px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer;">
                                             Rincian
                                         </button>
                                     </div>
@@ -279,13 +283,13 @@
         <div class="card" style="background: #ffffff; padding: 18px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div style="font-size: 12.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Total Personel Dinilai</div>
             <div style="font-size: 26px; font-weight: 800; color: #0f172a;">{{ $annualData['evaluated_employees'] }} / {{ $annualData['total_employees'] }}</div>
-            <div style="font-size: 11.5px; color: #0284c7; margin-top: 2px;">TAD aktif tahun {{ $year }}</div>
+            <div style="font-size: 11.5px; color: #475569; margin-top: 2px;">TAD aktif tahun {{ $year }}</div>
         </div>
 
         <div class="card" style="background: #ffffff; padding: 18px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
             <div style="font-size: 12.5px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Rata-Rata Tahunan Cabang</div>
-            <div style="font-size: 26px; font-weight: 800; color: #15803d;">{{ number_format($annualData['grand_average'], 2) }}</div>
-            <div style="font-size: 11.5px; color: #16a34a; margin-top: 2px; font-weight: 600;">Predikat: {{ $annualData['grand_predicate'] }}</div>
+            <div style="font-size: 26px; font-weight: 800; color: #00223B;">{{ number_format($annualData['grand_average'], 2) }}</div>
+            <div style="font-size: 11.5px; color: #475569; margin-top: 2px; font-weight: 600;">Predikat: {{ $annualData['grand_predicate'] }}</div>
         </div>
 
         <div class="card" style="background: #ffffff; padding: 18px 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">

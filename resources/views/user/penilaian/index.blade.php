@@ -49,31 +49,42 @@
 </div>
 @endif
 
-<!-- Tab Switcher Sesuai Bab 4.3 SRS -->
-<div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
-    <a href="{{ route('penilaian.index', ['month' => $month, 'year' => $year, 'tab' => 'pending']) }}" 
-       @if($activeTab === 'pending') aria-current="page" @endif
-       style="padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; {{ $activeTab === 'pending' ? 'background: #e0f2fe; color: #005FA8;' : 'color: #475569; background: transparent;' }}">
-        <span>Belum Dinilai</span>
-        <span class="tabular-nums" style="background: {{ $activeTab === 'pending' ? '#005FA8' : '#e2e8f0' }}; color: {{ $activeTab === 'pending' ? '#ffffff' : '#334155' }}; font-size: 11px; padding: 2px 8px; border-radius: 999px;">
-            {{ $totalPending }}
-        </span>
-    </a>
+<!-- Tab Switcher + Instant Quick Search (Shortcut /) -->
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px;">
+    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a href="{{ route('penilaian.index', ['month' => $month, 'year' => $year, 'tab' => 'pending']) }}" 
+           @if($activeTab === 'pending') aria-current="page" @endif
+           style="padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; {{ $activeTab === 'pending' ? 'background: #e0f2fe; color: #005FA8;' : 'color: #475569; background: transparent;' }}">
+            <span>Belum Dinilai</span>
+            <span class="tabular-nums" style="background: {{ $activeTab === 'pending' ? '#005FA8' : '#e2e8f0' }}; color: {{ $activeTab === 'pending' ? '#ffffff' : '#334155' }}; font-size: 11px; padding: 2px 8px; border-radius: 999px;">
+                {{ $totalPending }}
+            </span>
+        </a>
 
-    <a href="{{ route('penilaian.index', ['month' => $month, 'year' => $year, 'tab' => 'evaluated']) }}" 
-       @if($activeTab === 'evaluated') aria-current="page" @endif
-       style="padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; {{ $activeTab === 'evaluated' ? 'background: #e0f2fe; color: #005FA8;' : 'color: #475569; background: transparent;' }}">
-        <span>Sudah Dinilai</span>
-        <span class="tabular-nums" style="background: {{ $activeTab === 'evaluated' ? '#005FA8' : '#e2e8f0' }}; color: {{ $activeTab === 'evaluated' ? '#ffffff' : '#334155' }}; font-size: 11px; padding: 2px 8px; border-radius: 999px;">
-            {{ $totalEvaluated }}
-        </span>
-    </a>
+        <a href="{{ route('penilaian.index', ['month' => $month, 'year' => $year, 'tab' => 'evaluated']) }}" 
+           @if($activeTab === 'evaluated') aria-current="page" @endif
+           style="padding: 8px 20px; border-radius: 6px; font-size: 14px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; {{ $activeTab === 'evaluated' ? 'background: #e0f2fe; color: #005FA8;' : 'color: #475569; background: transparent;' }}">
+            <span>Sudah Dinilai</span>
+            <span class="tabular-nums" style="background: {{ $activeTab === 'evaluated' ? '#005FA8' : '#e2e8f0' }}; color: {{ $activeTab === 'evaluated' ? '#ffffff' : '#334155' }}; font-size: 11px; padding: 2px 8px; border-radius: 999px;">
+                {{ $totalEvaluated }}
+            </span>
+        </a>
+    </div>
+
+    <div class="quick-search-input-wrap">
+        <svg aria-hidden="true" class="search-ico" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="penilaianQuickSearch" data-quick-search class="quick-search-input" placeholder="Cari nama / jabatan TAD..." aria-label="Cari karyawan TAD dalam daftar">
+        <span class="kbd-hint" aria-hidden="true">/</span>
+    </div>
 </div>
 
 <!-- Konten Tabel Karyawan -->
 <div class="card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; font-size: 15px; font-weight: 700; color: #0f172a;">
-        Karyawan &mdash; {{ $monthNames[$month] ?? '' }} {{ $year }}
+    <div style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <span style="font-size: 15px; font-weight: 700; color: #0f172a;">
+            Karyawan &mdash; {{ $monthNames[$month] ?? '' }} {{ $year }}
+        </span>
+        <span id="penilaianRowCount" style="font-size: 12px; color: #64748b; font-weight: 500;"></span>
     </div>
 
     <div class="table-responsive">
@@ -88,10 +99,10 @@
                     <th style="padding: 14px 20px; text-align: center; width: 140px;">Aksi</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="penilaianTableBody">
                 @if($activeTab === 'pending')
                     @forelse($pendingEmployees as $index => $item)
-                        <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;">
+                        <tr class="penilaian-row" data-search="{{ strtolower($item['employee']->name.' '.($item['employee']->position ?? '')) }}" style="border-bottom: 1px solid #f1f5f9; transition: background 0.15s;">
                             <td style="padding: 14px 20px; color: #64748b;">{{ $index + 1 }}</td>
                             <td style="padding: 14px 20px; font-weight: 600; color: #0f172a;">{{ $item['employee']->name }}</td>
                             <td style="padding: 14px 20px; color: #475569;">{{ $item['employee']->position ?? '-' }}</td>
@@ -124,7 +135,7 @@
                     @endforelse
                 @else
                     @forelse($evaluatedEmployees as $index => $item)
-                        <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <tr class="penilaian-row" data-search="{{ strtolower($item['employee']->name.' '.($item['employee']->position ?? '')) }}" style="border-bottom: 1px solid #f1f5f9;">
                             <td style="padding: 14px 20px; color: #64748b;">{{ $index + 1 }}</td>
                             <td style="padding: 14px 20px; font-weight: 600; color: #0f172a;">{{ $item['employee']->name }}</td>
                             <td style="padding: 14px 20px; color: #475569;">{{ $item['employee']->position ?? '-' }}</td>
@@ -168,6 +179,11 @@
                         </tr>
                     @endforelse
                 @endif
+                <tr id="penilaianSearchEmptyRow" style="display: none;">
+                    <td colspan="6" style="padding: 36px 20px; text-align: center; color: #64748b; font-size: 13px;">
+                        Tidak ditemukan karyawan yang cocok dengan kata kunci "<strong id="penilaianSearchQueryText"></strong>".
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -269,5 +285,52 @@
             });
         }
     });
+
+    // Pencarian instan tabel karyawan TAD tanpa reload
+    (function () {
+        const searchInput = document.getElementById('penilaianQuickSearch');
+        const rows = Array.from(document.querySelectorAll('.penilaian-row'));
+        const emptyRow = document.getElementById('penilaianSearchEmptyRow');
+        const queryTextEl = document.getElementById('penilaianSearchQueryText');
+        const countEl = document.getElementById('penilaianRowCount');
+
+        if (!searchInput) return;
+
+        function applyQuickFilter() {
+            const q = searchInput.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            rows.forEach(function (row) {
+                const hay = (row.getAttribute('data-search') || '').toLowerCase();
+                const matched = !q || hay.includes(q);
+                row.style.display = matched ? '' : 'none';
+                if (matched) visibleCount++;
+            });
+
+            if (emptyRow && queryTextEl) {
+                if (rows.length > 0 && visibleCount === 0 && q !== '') {
+                    queryTextEl.textContent = searchInput.value.trim();
+                    emptyRow.style.display = '';
+                } else {
+                    emptyRow.style.display = 'none';
+                }
+            }
+
+            if (countEl && rows.length > 0) {
+                countEl.textContent = q
+                    ? 'Menampilkan ' + visibleCount + ' dari ' + rows.length + ' karyawan'
+                    : 'Total ' + rows.length + ' karyawan';
+            }
+        }
+
+        searchInput.addEventListener('input', applyQuickFilter);
+        searchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && searchInput.value !== '') {
+                searchInput.value = '';
+                applyQuickFilter();
+            }
+        });
+        applyQuickFilter();
+    })();
 </script>
 @endsection

@@ -89,11 +89,12 @@ class DashboardController extends Controller
         $totalDivisions = $divisions->count();
         $totalEmployees = (int) $divisions->sum('employees_count');
 
-        // 2. Evaluations for this period with eager-loaded employee
-        $evaluations = Evaluation::with(['employee'])
-            ->where('period_month', $month)
+        // 2. Evaluations for entire selected year in 1 query (powers monthly KPIs, 12-month trend & division heatmap)
+        $yearEvaluations = Evaluation::query()
             ->where('period_year', $year)
-            ->get();
+            ->get(['id', 'employee_id', 'division_id', 'period_month', 'period_year', 'total_score', 'predicate']);
+
+        $evaluations = $yearEvaluations->where('period_month', $month)->values();
 
         // Link pre-loaded divisions in memory (both active and inactive) to avoid N+1 queries in Blade
         foreach ($evaluations as $eval) {
@@ -110,10 +111,8 @@ class DashboardController extends Controller
             ? round(($totalEvaluated / $totalEmployees) * 100)
             : 0;
 
-        // Metrik Statistik Lanjutan (Information Richness)
+        // Metrik Statistik Lanjutan
         $averageScore = $totalEvaluated > 0 ? round($evaluations->avg('total_score'), 1) : 0;
-        $highestScore = $totalEvaluated > 0 ? round($evaluations->max('total_score'), 1) : 0;
-        $lowestScore = $totalEvaluated > 0 ? round($evaluations->min('total_score'), 1) : 0;
 
         // Predikat Rata-Rata Cabang
         $averagePredicate = 'Belum Ada Data';
@@ -158,12 +157,26 @@ class DashboardController extends Controller
             ];
         }
 
-        // 2. Top 5 & Bottom 5 Performers Cabang
-        $topPerformers = $evaluations->sortByDesc('total_score')->take(5)->values();
-        $bottomPerformers = $evaluations->sortBy('total_score')->take(5)->values();
+        // 2. Tren Rata-Rata Skor 12 Bulan (In-Memory dari $yearEvaluations)
+        $monthNames = EvaluationScoringService::MONTH_NAMES;
+        $yearEvaluationsByMonth = $yearEvaluations->groupBy('period_month');
+        $monthlyTrend = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $mEvals = $yearEvaluationsByMonth->get($m, collect());
+            $mCount = $mEvals->count();
+            $mAvg = $mCount > 0 ? round((float) $mEvals->avg('total_score'), 1) : null;
+            $fullName = $monthNames[$m] ?? (string) $m;
+
+            $monthlyTrend[] = [
+                'month' => $m,
+                'label' => substr($fullName, 0, 3),
+                'full_name' => $fullName,
+                'avg_score' => $mAvg,
+                'count' => $mCount,
+            ];
+        }
 
         // 3. Countdown SLA Gembok (Cutoff tgl 25)
-        $monthNames = EvaluationScoringService::MONTH_NAMES;
 
         try {
             $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59);
@@ -215,6 +228,40 @@ class DashboardController extends Controller
             ];
         }
 
+        // 6. Heatmap Status Periode & Kepatuhan (Divisi x 12 Bulan)
+        $yearPeriods = PeriodManagement::where('period_year', $year)
+            ->get(['division_id', 'period_month', 'status'])
+            ->groupBy('division_id');
+        $yearEvalsByDivMonth = $yearEvaluations->groupBy(fn ($e) => $e->division_id.'_'.$e->period_month);
+
+        $periodHeatmap = [];
+        foreach ($divisions as $div) {
+            $divPeriodMap = $yearPeriods->get($div->id, collect())->keyBy('period_month');
+            $monthsRow = [];
+            for ($m = 1; $m <= 12; $m++) {
+                $record = $divPeriodMap->get($m);
+                $cellStatus = $record
+                    ? $record->status
+                    : (($m === $currentMonth && $year === $currentYear) ? 'open' : 'closed');
+                $cellEvals = $yearEvalsByDivMonth->get($div->id.'_'.$m, collect());
+                $cellCount = $cellEvals->count();
+                $cellAvg = $cellCount > 0 ? round((float) $cellEvals->avg('total_score'), 1) : null;
+
+                $monthsRow[$m] = [
+                    'month' => $m,
+                    'status' => $cellStatus,
+                    'evaluated_count' => $cellCount,
+                    'total_employees' => (int) $div->employees_count,
+                    'avg_score' => $cellAvg,
+                ];
+            }
+
+            $periodHeatmap[] = [
+                'division' => $div,
+                'months' => $monthsRow,
+            ];
+        }
+
         // Permohonan Akses Terbaru (Consolidated 1 query with leftJoin instead of 4 separate queries)
         $recentRequests = $pendingRequestsCount > 0
             ? EditRequest::query()
@@ -244,6 +291,7 @@ class DashboardController extends Controller
             'month' => $month,
             'year' => $year,
             'monthName' => $monthNames[$month] ?? '-',
+            'monthNames' => $monthNames,
             'totalEmployees' => $totalEmployees,
             'totalDivisions' => $totalDivisions,
             'totalPenilai' => $totalPenilai,
@@ -252,8 +300,6 @@ class DashboardController extends Controller
             'totalPending' => $totalPending,
             'branchProgress' => $branchProgress,
             'averageScore' => $averageScore,
-            'highestScore' => $highestScore,
-            'lowestScore' => $lowestScore,
             'averagePredicate' => $averagePredicate,
             'predicateCounts' => $predicateCounts,
             'predicatePercentages' => $predicatePercentages,
@@ -261,12 +307,12 @@ class DashboardController extends Controller
             'lockedDivisionsCount' => $lockedDivisionsCount,
             'recentRequests' => $recentRequests,
 
-            // 5 Matriks Data Strategis
+            // Visualisasi Data Lengkap & Matriks Strategis
+            'monthlyTrend' => $monthlyTrend,
+            'periodHeatmap' => $periodHeatmap,
             'akhlakStats' => $akhlakStats,
             'weakestPillar' => $weakestPillar,
             'strongestPillar' => $strongestPillar,
-            'topPerformers' => $topPerformers,
-            'bottomPerformers' => $bottomPerformers,
             'slaCutoffDate' => '25 '.($monthNames[$month] ?? '-').' '.$year.', 23:59 WIB',
             'slaDaysRemaining' => $slaDaysRemaining,
             'isCutoffPassed' => $isCutoffPassed,

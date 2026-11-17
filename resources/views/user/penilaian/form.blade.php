@@ -38,6 +38,33 @@
     </div>
 </div>
 
+<div id="evalStickyBar" class="eval-sticky-bar">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span style="font-size: 12.5px; font-weight: 700; color: #0F172A;">
+                Kelengkapan Butir: <span id="evalFilledCount" class="tabular-nums">0</span>/<span id="evalTotalCount" class="tabular-nums">17</span>
+            </span>
+            <div style="width: 110px; height: 6px; background: #E2E8F0; border-radius: 999px; overflow: hidden;" aria-hidden="true">
+                <div id="evalProgressFill" style="width: 0%; height: 100%; background: #00223B; border-radius: 999px; transition: width 0.2s ease;"></div>
+            </div>
+            <span id="draftSaveStatus" style="font-size: 11.5px; color: #64748B;">Draf otomatis aktif</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 12px; color: #475569; font-weight: 600;">Estimasi Skor:</span>
+            <strong id="liveScoreValue" class="tabular-nums" style="font-size: 17px; font-weight: 800; color: #00223B;">0.00</strong>
+            <span id="livePredicateBadge" class="badge-clean badge-clean-neutral" style="font-size: 10.5px;">-</span>
+        </div>
+    </div>
+    <nav aria-label="Navigasi cepat kategori AKHLAK" style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding-top: 8px; border-top: 1px solid #E2E8F0;">
+        <span style="font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-inline-end: 4px;">Loncat:</span>
+        @foreach($categories as $categoryIndex => $cat)
+            <a href="#cat-section-{{ $cat->id }}" class="eval-cat-chip">
+                {{ $cat->order_index ?? ($categoryIndex + 1) }}. {{ $cat->name }}
+            </a>
+        @endforeach
+    </nav>
+</div>
+
 <form id="evaluationForm" action="{{ route('penilaian.store') }}" method="POST">
     @csrf
     <input type="hidden" name="employee_id" value="{{ $employee->id }}">
@@ -47,7 +74,7 @@
     @php $itemGlobalNumber = 1; @endphp
 
     @foreach($categories as $categoryIndex => $cat)
-        <div class="card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
+        <div id="cat-section-{{ $cat->id }}" class="card" style="scroll-margin-top: 165px; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.04);">
             <!-- Header Kategori Navy dengan Nomor Lingkaran Sesuai SRS -->
             <div style="background: #00223B; color: #ffffff; padding: 14px 20px; display: flex; align-items: center; gap: 10px;">
                 <div style="width: 26px; height: 26px; border-radius: 50%; background: #38BDF8; color: #00223B; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
@@ -146,9 +173,58 @@
 </style>
 
 <script>
-    // Fitur Anti Data Loss (Auto Save Draft di LocalStorage)
+    // Fitur Anti Data Loss (Auto Save Draft) + Kalkulator Estimasi Skor Real-Time
     const empId = "{{ $employee->id }}";
     const draftKey = `draft_eval_${empId}_{{ $month }}_{{ $year }}`;
+    const ratingScoreMap = { 1: 0.98, 2: 1.96, 3: 2.94, 4: 3.92, 5: 4.90, 6: 5.88 };
+
+    function updateLiveScoreSummary() {
+        const groups = new Set();
+        document.querySelectorAll('.rating-radio').forEach(r => groups.add(r.dataset.subid));
+        const totalItems = groups.size;
+
+        const checkedRadios = document.querySelectorAll('.rating-radio:checked');
+        const filledCount = checkedRadios.length;
+
+        let totalScore = 0;
+        checkedRadios.forEach(r => {
+            totalScore += ratingScoreMap[parseInt(r.value, 10)] || 0;
+        });
+        const roundedScore = Math.round(totalScore * 100) / 100;
+
+        const filledEl = document.getElementById('evalFilledCount');
+        const totalEl = document.getElementById('evalTotalCount');
+        const barEl = document.getElementById('evalProgressFill');
+        const scoreEl = document.getElementById('liveScoreValue');
+        const badgeEl = document.getElementById('livePredicateBadge');
+
+        if (filledEl) filledEl.textContent = filledCount;
+        if (totalEl) totalEl.textContent = totalItems;
+        if (barEl && totalItems > 0) {
+            barEl.style.width = Math.round((filledCount / totalItems) * 100) + '%';
+        }
+        if (scoreEl) scoreEl.textContent = roundedScore.toFixed(2);
+
+        if (badgeEl) {
+            badgeEl.className = 'badge-clean';
+            if (filledCount === 0) {
+                badgeEl.classList.add('badge-clean-neutral');
+                badgeEl.textContent = '-';
+            } else if (roundedScore >= 85.0) {
+                badgeEl.classList.add('badge-clean-success');
+                badgeEl.textContent = 'Sangat Baik';
+            } else if (roundedScore >= 70.0) {
+                badgeEl.classList.add('badge-clean-accent');
+                badgeEl.textContent = 'Baik';
+            } else if (roundedScore >= 55.0) {
+                badgeEl.classList.add('badge-clean-warning');
+                badgeEl.textContent = 'Cukup Baik';
+            } else {
+                badgeEl.classList.add('badge-clean-danger');
+                badgeEl.textContent = 'Perlu Perhatian';
+            }
+        }
+    }
 
     // Auto save textarea
     document.querySelectorAll('.auto-save-input').forEach(textarea => {
@@ -157,9 +233,10 @@
         });
     });
 
-    // Auto save radio
+    // Auto save radio + Live score recalc
     document.querySelectorAll('.rating-radio').forEach(radio => {
         radio.addEventListener('change', () => {
+            updateLiveScoreSummary();
             saveDraft();
         });
     });
@@ -175,11 +252,18 @@
             reasons[t.dataset.key] = t.value;
         });
 
-        localStorage.setItem(draftKey, JSON.stringify({ ratings, reasons, time: new Date().getTime() }));
+        const now = new Date();
+        localStorage.setItem(draftKey, JSON.stringify({ ratings, reasons, time: now.getTime() }));
+        const statusEl = document.getElementById('draftSaveStatus');
+        if (statusEl) {
+            statusEl.textContent = 'Draf tersimpan ' + now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        }
     }
 
-    // Inisialisasi Deteksi & Pemulihan Draf Tersimpan
+    // Inisialisasi Estimasi Skor + Deteksi & Pemulihan Draf Tersimpan
     document.addEventListener('DOMContentLoaded', () => {
+        updateLiveScoreSummary();
+
         const savedDraft = localStorage.getItem(draftKey);
         if (!savedDraft) return;
 
@@ -206,7 +290,6 @@
                                 const radio = document.querySelector(`.rating-radio[data-subid="${subId}"][value="${ratingVal}"]`);
                                 if (radio) {
                                     radio.checked = true;
-                                    radio.dispatchEvent(new Event('change', { bubbles: true }));
                                 }
                             });
                         }
@@ -218,6 +301,7 @@
                                 }
                             });
                         }
+                        updateLiveScoreSummary();
                         alertEl.style.display = 'none';
                     });
 

@@ -19,5 +19,6 @@
 .vscode/
 playwright-report/
 test-results/
+scratch/
 Thumbs.db
 .DS_Store

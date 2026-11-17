@@ -47,6 +47,20 @@
                 if (sidebar && sidebar.classList.contains('open')) {
                     window.toggleSidebar();
                 }
+            } else if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                var active = document.activeElement;
+                var tag = active ? active.tagName.toLowerCase() : '';
+                if (tag === 'input' || tag === 'textarea' || tag === 'select' || (active && active.isContentEditable)) {
+                    return;
+                }
+                var searchEl = document.querySelector('[data-quick-search]');
+                if (searchEl) {
+                    e.preventDefault();
+                    searchEl.focus();
+                    if (typeof searchEl.select === 'function') {
+                        searchEl.select();
+                    }
+                }
             }
         });
 

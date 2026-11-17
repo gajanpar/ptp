@@ -61,13 +61,12 @@ class DashboardController extends Controller
             $user->setRelation('division', null);
         }
 
-        // 2. Consolidated Evaluations for current and previous month (1 query)
-        $evaluations = Evaluation::where(function ($q) use ($month, $year, $prevMonth, $prevYear) {
-            $q->where(function ($sub) use ($month, $year) {
-                $sub->where('period_month', $month)->where('period_year', $year);
-            })->orWhere(function ($sub) use ($prevMonth, $prevYear) {
-                $sub->where('period_month', $prevMonth)->where('period_year', $prevYear);
-            });
+        // 2. Consolidated Evaluations for selected year and previous month (1 query)
+        $evaluations = Evaluation::where(function ($q) use ($year, $prevMonth, $prevYear) {
+            $q->where('period_year', $year)
+                ->orWhere(function ($sub) use ($prevMonth, $prevYear) {
+                    $sub->where('period_month', $prevMonth)->where('period_year', $prevYear);
+                });
         })
             ->when($divisionId, fn ($q) => $q->where('division_id', $divisionId))
             ->get();
@@ -139,10 +138,28 @@ class DashboardController extends Controller
             ];
         }
 
-        $topPerformers = $currentEvaluations->sortByDesc('total_score')->take(5)->values();
-        $bottomPerformers = $currentEvaluations->sortBy('total_score')->take(5)->values();
-
         $monthNames = EvaluationScoringService::MONTH_NAMES;
+
+        // Tren Rata-Rata Skor Divisi 12 Bulan (In-Memory dari $evaluations, 0 query tambahan)
+        $yearEvaluationsByMonth = $evaluations
+            ->filter(fn ($e) => (int) $e->period_year === $year)
+            ->groupBy(fn ($e) => (int) $e->period_month);
+
+        $monthlyTrend = [];
+        for ($m = 1; $m <= 12; $m++) {
+            $mEvals = $yearEvaluationsByMonth->get($m, collect());
+            $mCount = $mEvals->count();
+            $mAvg = $mCount > 0 ? round((float) $mEvals->avg('total_score'), 1) : null;
+            $fullName = $monthNames[$m] ?? (string) $m;
+
+            $monthlyTrend[] = [
+                'month' => $m,
+                'label' => substr($fullName, 0, 3),
+                'full_name' => $fullName,
+                'avg_score' => $mAvg,
+                'count' => $mCount,
+            ];
+        }
 
         try {
             $cutoffDate = Carbon::create($year, $month, 25, 23, 59, 59);
@@ -185,11 +202,10 @@ class DashboardController extends Controller
             'pendingEmployees' => $pendingEmployees,
             'recentEvaluated' => $recentEvaluated,
 
+            'monthlyTrend' => $monthlyTrend,
             'akhlakStats' => $akhlakStats,
             'weakestPillar' => $weakestPillar,
             'strongestPillar' => $strongestPillar,
-            'topPerformers' => $topPerformers,
-            'bottomPerformers' => $bottomPerformers,
             'slaCutoffDate' => '25 '.($monthNames[$month] ?? '-').' '.$year.', 23:59 WIB',
             'slaDaysRemaining' => $slaDaysRemaining,
             'isCutoffPassed' => $isCutoffPassed,
