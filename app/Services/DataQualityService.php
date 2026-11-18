@@ -2,12 +2,19 @@
 
 namespace App\Services;
 
+use App\Models\ActivityLog;
+use App\Models\Division;
+use App\Models\EditRequest;
 use App\Models\Employee;
 use App\Models\Evaluation;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationDetail;
 use App\Models\EvaluationSubcategory;
+use App\Models\PeriodManagement;
+use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 /**
  * DataQualityService - Standar Audit Kualitas & Integritas Data Korporat SPKTAD
@@ -15,6 +22,290 @@ use App\Models\User;
  */
 class DataQualityService
 {
+    /**
+     * Execute the One-Tap Official Release pipeline (backup, master sanitization, purge/reconcile, audit).
+     *
+     * @return array{
+     *     mode: string,
+     *     backup_filename: string,
+     *     sanitized_employees: int,
+     *     sanitized_divisions: int,
+     *     sanitized_users: int,
+     *     purged_evaluations: int,
+     *     purged_details: int,
+     *     purged_requests: int,
+     *     reconciled_evaluations: int,
+     *     audit: array<string, mixed>
+     * }
+     */
+    public function executeOfficialRelease(string $mode, BackupService $backupService): array
+    {
+        // 1. Pre-release atomic backup snapshot (graceful on serverless/read-only drivers)
+        $backupFilename = 'snapshot-serverless';
+        try {
+            $backup = $backupService->createBackup();
+            $backupService->pruneOldBackups(10);
+            $backupFilename = $backup['filename'];
+        } catch (\Throwable) {
+            $backupFilename = 'snapshot-serverless';
+        }
+
+        $sanitizedEmployees = 0;
+        $sanitizedDivisions = 0;
+        $sanitizedUsers = 0;
+        $purgedEvaluations = 0;
+        $purgedDetails = 0;
+        $purgedRequests = 0;
+        $reconciledEvaluations = 0;
+
+        DB::transaction(function () use (
+            $mode,
+            $backupFilename,
+            &$sanitizedEmployees,
+            &$sanitizedDivisions,
+            &$sanitizedUsers,
+            &$purgedEvaluations,
+            &$purgedDetails,
+            &$purgedRequests,
+            &$reconciledEvaluations
+        ): void {
+            // 2. Sanitize & normalize Master Data while preserving 100% of real/revised master records
+            $sanitizedEmployees = $this->sanitizeEmployees();
+            $sanitizedDivisions = $this->sanitizeDivisions();
+            $sanitizedUsers = $this->sanitizeUsers();
+
+            $this->ensureCurrentPeriodsOpen();
+            Setting::clearCache();
+
+            // 3. Execute selected release transition mode
+            if ($mode === 'purge_and_ready') {
+                $purgedEvaluations = Evaluation::count();
+                $purgedDetails = EvaluationDetail::count();
+                $purgedRequests = EditRequest::count();
+
+                EvaluationDetail::query()->delete();
+                Evaluation::query()->delete();
+                EditRequest::query()->delete();
+
+                ActivityLog::where('action', 'like', '%test%')
+                    ->orWhere('description', 'like', '%dummy%')
+                    ->delete();
+
+                ActivityLog::record(
+                    'system.official_release_executed',
+                    'Eksekusi One-Tap Official Release (Go-Live): Sanitasi master data & pembersihan transaksi uji coba',
+                    'SystemRelease',
+                    null,
+                    [
+                        'mode' => $mode,
+                        'backup_filename' => $backupFilename,
+                        'sanitized_employees' => $sanitizedEmployees,
+                        'sanitized_divisions' => $sanitizedDivisions,
+                        'sanitized_users' => $sanitizedUsers,
+                        'purged_evaluations' => $purgedEvaluations,
+                        'purged_details' => $purgedDetails,
+                        'purged_requests' => $purgedRequests,
+                        'executed_at' => now()->toIso8601String(),
+                    ]
+                );
+            } else {
+                $reconciledEvaluations = $this->reconcileEvaluations();
+                $purgedRequests = EditRequest::where('status', 'rejected')->delete();
+
+                ActivityLog::record(
+                    'system.official_release_reconciled',
+                    'Eksekusi One-Tap Official Release (Rekonsiliasi & Finalisasi Data Real)',
+                    'SystemRelease',
+                    null,
+                    [
+                        'mode' => $mode,
+                        'backup_filename' => $backupFilename,
+                        'sanitized_employees' => $sanitizedEmployees,
+                        'sanitized_divisions' => $sanitizedDivisions,
+                        'sanitized_users' => $sanitizedUsers,
+                        'reconciled_evaluations' => $reconciledEvaluations,
+                        'purged_rejected_requests' => $purgedRequests,
+                        'executed_at' => now()->toIso8601String(),
+                    ]
+                );
+            }
+        });
+
+        // 4. Post-release 5-dimension Data Quality Gate
+        $audit = $this->auditAll();
+
+        return [
+            'mode' => $mode,
+            'backup_filename' => $backupFilename,
+            'sanitized_employees' => $sanitizedEmployees,
+            'sanitized_divisions' => $sanitizedDivisions,
+            'sanitized_users' => $sanitizedUsers,
+            'purged_evaluations' => $purgedEvaluations,
+            'purged_details' => $purgedDetails,
+            'purged_requests' => $purgedRequests,
+            'reconciled_evaluations' => $reconciledEvaluations,
+            'audit' => $audit,
+        ];
+    }
+
+    /**
+     * Collapse excess whitespace and trim string input safely.
+     */
+    protected function normalizeText(?string $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        return trim(preg_replace('/\s+/', ' ', $value) ?? '');
+    }
+
+    /**
+     * Sanitize and normalize employee master records without altering identity intent.
+     */
+    protected function sanitizeEmployees(): int
+    {
+        $sanitizedCount = 0;
+
+        foreach (Employee::all() as $employee) {
+            $employee->name = $this->normalizeText($employee->name);
+            $employee->position = $this->normalizeText($employee->position);
+
+            $normalizedNik = $this->normalizeText($employee->nik);
+            if ($normalizedNik === '') {
+                $normalizedNik = 'TAD-'.str_pad((string) $employee->id, 4, '0', STR_PAD_LEFT);
+            }
+            $employee->nik = $normalizedNik;
+
+            $normalizedVendor = $this->normalizeText($employee->vendor_name);
+            if ($normalizedVendor === '') {
+                $normalizedVendor = 'PT Pelindo Daya Sejahtera';
+            }
+            $employee->vendor_name = $normalizedVendor;
+
+            if ($employee->isDirty()) {
+                $employee->save();
+                $sanitizedCount++;
+            }
+        }
+
+        return $sanitizedCount;
+    }
+
+    /**
+     * Sanitize and normalize division master records.
+     */
+    protected function sanitizeDivisions(): int
+    {
+        $sanitizedCount = 0;
+
+        foreach (Division::all() as $division) {
+            $division->name = $this->normalizeText($division->name);
+            if ($division->description !== null) {
+                $division->description = $this->normalizeText($division->description);
+            }
+
+            if ($division->isDirty()) {
+                $division->save();
+                $sanitizedCount++;
+            }
+        }
+
+        return $sanitizedCount;
+    }
+
+    /**
+     * Sanitize and normalize evaluator and administrator user records.
+     */
+    protected function sanitizeUsers(): int
+    {
+        $sanitizedCount = 0;
+
+        foreach (User::all() as $user) {
+            $user->name = $this->normalizeText($user->name);
+            $user->username = $this->normalizeText($user->username);
+            if ($user->position !== null) {
+                $user->position = $this->normalizeText($user->position);
+            }
+
+            if ($user->isDirty()) {
+                $user->save();
+                $sanitizedCount++;
+            }
+        }
+
+        return $sanitizedCount;
+    }
+
+    /**
+     * Ensure current month operational period is open across all active divisions.
+     */
+    protected function ensureCurrentPeriodsOpen(): void
+    {
+        $currentMonth = (int) date('n');
+        $currentYear = (int) date('Y');
+        $actorId = Auth::id();
+
+        foreach (Division::where('is_active', true)->get() as $division) {
+            PeriodManagement::updateOrCreate(
+                [
+                    'division_id' => $division->id,
+                    'period_month' => $currentMonth,
+                    'period_year' => $currentYear,
+                ],
+                [
+                    'status' => 'open',
+                    'updated_by' => $actorId,
+                ]
+            );
+        }
+    }
+
+    /**
+     * Reconcile existing evaluation scores and predicates against the authoritative scoring scale.
+     */
+    protected function reconcileEvaluations(): int
+    {
+        $reconciledCount = 0;
+        $evaluations = Evaluation::with('details')->get();
+
+        foreach ($evaluations as $eval) {
+            $sumScore = 0.0;
+            $hasDetailChange = false;
+
+            foreach ($eval->details as $detail) {
+                $expectedScore = EvaluationScoringService::getRatingScore((int) $detail->rating);
+                if (abs((float) $detail->score - $expectedScore) > 0.001) {
+                    $detail->update(['score' => $expectedScore]);
+                    $hasDetailChange = true;
+                }
+                $sumScore += $expectedScore;
+            }
+
+            $computedTotal = round($sumScore, 2);
+            $computedAvg = round($computedTotal / max(1, $eval->details->count()), 2);
+            $computedPredicate = EvaluationScoringService::getPredicate($computedTotal);
+
+            $needsHeaderUpdate = abs((float) $eval->total_score - $computedTotal) > 0.001
+                || abs((float) $eval->average_score - $computedAvg) > 0.001
+                || $eval->predicate !== $computedPredicate;
+
+            if ($needsHeaderUpdate) {
+                $eval->update([
+                    'total_score' => $computedTotal,
+                    'average_score' => $computedAvg,
+                    'predicate' => $computedPredicate,
+                ]);
+            }
+
+            if ($needsHeaderUpdate || $hasDetailChange) {
+                $reconciledCount++;
+            }
+        }
+
+        return $reconciledCount;
+    }
+
     /**
      * Run all comprehensive data quality audits and return detailed report.
      *

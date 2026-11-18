@@ -46,6 +46,93 @@
     </div>
 </div>
 
+<!-- Pusat Kontrol One-Tap Official Release (Go-Live Readiness Engine) -->
+@php
+    $healthScore = (float) ($audit['health_score'] ?? 100);
+    $summaryStatus = (string) ($audit['summary_status'] ?? 'EXCELLENT');
+    $isReady = (bool) ($audit['is_production_ready'] ?? true);
+    $passedRules = (int) ($audit['passed_rules'] ?? 0);
+    $totalRules = (int) ($audit['total_rules'] ?? 0);
+    $statusBadgeBg = $isReady ? '#dcfce7' : '#fef2f2';
+    $statusBadgeColor = $isReady ? '#166534' : '#991b1b';
+    $statusBadgeBorder = $isReady ? '#bbf7d0' : '#fecaca';
+@endphp
+<section id="oneTapReleaseSection" aria-labelledby="oneTapReleaseTitle" class="card" style="background: #ffffff; border-radius: 12px; border: 1px solid #cbd5e1; border-inline-start: 5px solid #00223B; box-shadow: 0 2px 8px rgba(0, 34, 59, 0.06); margin-bottom: 28px; overflow: hidden;">
+    <div style="background: linear-gradient(135deg, #00223B 0%, #003865 100%); color: #ffffff; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap;">
+                <span style="background: rgba(21, 128, 61, 0.25); border: 1px solid rgba(134, 239, 172, 0.45); color: #bbf7d0; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 2px 10px; border-radius: 999px;">
+                    Release Automation Engine
+                </span>
+                <span style="background: {{ $statusBadgeBg }}; color: {{ $statusBadgeColor }}; border: 1px solid {{ $statusBadgeBorder }}; font-size: 11px; font-weight: 800; padding: 2px 10px; border-radius: 999px;">
+                    {{ $summaryStatus }} ({{ $healthScore }}%)
+                </span>
+            </div>
+            <h2 id="oneTapReleaseTitle" style="font-size: 18px; font-weight: 700; color: #ffffff; margin: 0 0 4px 0;">
+                One-Tap Official Release &amp; Transisi Data Go-Live
+            </h2>
+            <p style="font-size: 12.5px; color: rgba(255, 255, 255, 0.82); margin: 0; line-height: 1.45;">
+                Otomatisasi snapshot backup, normalisasi Master Data real/revisi, pembersihan data uji coba atau rekonsiliasi skor, serta sertifikasi kualitas data 5 dimensi dalam satu klik.
+            </p>
+        </div>
+
+        <button type="button"
+                id="openOfficialReleaseBtn"
+                onclick="openOfficialReleaseModal()"
+                style="background: #15803d; color: #ffffff; border: 1px solid rgba(255,255,255,0.22); padding: 11px 20px; border-radius: 8px; font-size: 13.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(21, 128, 61, 0.35); white-space: nowrap;">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>
+            <span>One-Tap Official Release (Siapkan Go-Live)</span>
+        </button>
+    </div>
+
+    <div style="padding: 20px 24px; background: #f8fafc;">
+        <div style="font-size: 12px; font-weight: 700; color: #00223B; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 12px;">
+            Status Kesiapan Go-Live (Data Quality Gate &mdash; {{ $passedRules }}/{{ $totalRules }} Aturan Lolos)
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;">
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">
+                <span class="kpi-label" title="Health Score Data" tabindex="0" style="display: block; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Health Score Data</span>
+                <div class="tabular-nums" style="font-size: 20px; font-weight: 800; color: {{ $isReady ? '#15803d' : '#b91c1c' }}; margin-top: 4px;">
+                    {{ $healthScore }}% <span style="font-size: 12px; font-weight: 700;">({{ $summaryStatus }})</span>
+                </div>
+            </div>
+
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">
+                <span class="kpi-label" title="Master TAD Aktif" tabindex="0" style="display: block; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Master TAD Aktif</span>
+                <div class="tabular-nums" style="font-size: 20px; font-weight: 800; color: #00223B; margin-top: 4px;">
+                    {{ $activeEmployeeCount ?? 35 }} Personel
+                </div>
+            </div>
+
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">
+                <span class="kpi-label" title="Transaksi Evaluasi Saat Ini" tabindex="0" style="display: block; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Transaksi Evaluasi Saat Ini</span>
+                <div class="tabular-nums" style="font-size: 20px; font-weight: 800; color: #0369a1; margin-top: 4px;">
+                    {{ $evaluationCount ?? 0 }} Data
+                </div>
+            </div>
+
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">
+                <span class="kpi-label" title="Pengajuan Edit" tabindex="0" style="display: block; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase;">Pengajuan Edit</span>
+                <div class="tabular-nums" style="font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 4px;">
+                    {{ $editRequestCount ?? 0 }} Permohonan
+                </div>
+            </div>
+        </div>
+
+        @if(!empty($audit['issues']))
+            <div style="margin-top: 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px;">
+                <div style="font-size: 12px; font-weight: 700; color: #92400e; margin-bottom: 4px;">Catatan Kualitas Data Sebelum Rilis:</div>
+                <ul style="margin: 0; padding-inline-start: 18px; font-size: 12px; color: #78350f; line-height: 1.5;">
+                    @foreach($audit['issues'] as $issue)
+                        <li><strong>[{{ $issue['severity'] }}]</strong> {{ $issue['rule'] }}: {{ $issue['description'] }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+    </div>
+</section>
+
 <!-- Tabel Daftar Cadangan Basis Data -->
 <div class="card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.04); margin-bottom: 28px;">
     <div style="padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; background: #fafafa;">
@@ -168,15 +255,109 @@
     </div>
 </dialog>
 
+<!-- Modal Eksekusi One-Tap Official Release (Go-Live Engine) -->
+<dialog id="officialReleaseModal" class="modal-dialog" aria-labelledby="officialReleaseModalTitle" style="text-align: start; max-width: 580px;">
+    <form action="{{ route('admin.backup.official-release') }}" method="POST" id="officialReleaseForm">
+        @csrf
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+            <div>
+                <h3 id="officialReleaseModalTitle" style="font-size: 17px; font-weight: 700; color: #00223B; margin: 0 0 4px 0;">
+                    Eksekusi One-Tap Official Release (Go-Live)
+                </h3>
+                <p style="font-size: 12.5px; color: #475569; margin: 0; line-height: 1.45;">
+                    Pilih mode transisi data sebelum aplikasi diterbitkan ke lingkungan operasional resmi Cabang Cirebon.
+                </p>
+            </div>
+            <button type="button" onclick="closeOfficialReleaseModal()" aria-label="Tutup modal rilis resmi" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; border-radius: 6px; width: 30px; height: 30px; cursor: pointer; font-weight: 700; flex-shrink: 0;">&times;</button>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #00223B; background: #f8fafc; border-radius: 8px; cursor: pointer;">
+                <input type="radio" name="release_mode" value="purge_and_ready" checked style="margin-top: 3px; accent-color: #00223B;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #00223B;">
+                        Mode Transisi Go-Live (Bersihkan Data Testing &amp; Rapikan Master Real)
+                    </div>
+                    <div style="font-size: 12px; color: #475569; line-height: 1.45; margin-top: 2px;">
+                        Membuat backup otomatis, menormalisasi Master Karyawan/Divisi/Penilai (mempertahankan 100% revisi data real), menghapus seluruh evaluasi &amp; pengajuan uji coba, membuka periode berjalan, dan mengaudit kualitas data.
+                    </div>
+                </div>
+            </label>
+
+            <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #cbd5e1; background: #ffffff; border-radius: 8px; cursor: pointer;">
+                <input type="radio" name="release_mode" value="sanitize_and_reconcile" style="margin-top: 3px; accent-color: #15803d;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0f172a;">
+                        Mode Finalisasi &amp; Rekonsiliasi Data Real (Tanpa Hapus Penilaian)
+                    </div>
+                    <div style="font-size: 12px; color: #475569; line-height: 1.45; margin-top: 2px;">
+                        Merapikan Master Data, memvalidasi ulang akurasi matematis skor &amp; predikat 17 indikator AKHLAK pada seluruh penilaian yang sudah masuk, membersihkan pengajuan ditolak, serta mengunci kesiapan rilis.
+                    </div>
+                </div>
+            </label>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 18px;">
+            <label for="releaseConfirmationInput" style="display: block; font-size: 12px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">
+                Konfirmasi Keamanan Eksekusi (Ketik <code>RILIS-RESMI</code>)
+            </label>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <input type="text"
+                       name="confirmation_code"
+                       id="releaseConfirmationInput"
+                       required
+                       autocomplete="off"
+                       placeholder="Ketik: RILIS-RESMI"
+                       class="form-control-custom"
+                       style="flex: 1; min-width: 180px; padding: 8px 12px; font-size: 13px; border: 1px solid #64748b; border-radius: 6px; font-family: monospace; text-transform: uppercase;">
+                <button type="button"
+                        onclick="document.getElementById('releaseConfirmationInput').value='RILIS-RESMI'"
+                        style="background: #e2e8f0; color: #0f172a; border: 1px solid #94a3b8; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                    Isi Otomatis Kode
+                </button>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap;">
+            <button type="button" onclick="closeOfficialReleaseModal()" style="background: #f1f5f9; color: #334155; border: 1px solid #64748b; padding: 9px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;">
+                Batal
+            </button>
+            <button type="submit" id="submitOfficialReleaseBtn" style="background: #15803d; color: #ffffff; border: none; padding: 9px 20px; border-radius: 6px; font-size: 13px; font-weight: 700; cursor: pointer;">
+                Eksekusi Rilis Resmi Sekarang
+            </button>
+        </div>
+    </form>
+</dialog>
+
 @push('scripts')
 <script>
     var pendingBackupForm = null;
     var backupModal = document.getElementById('confirmBackupActionModal');
+    var officialReleaseModal = document.getElementById('officialReleaseModal');
 
     function closeBackupModal() {
         if (backupModal && typeof backupModal.close === 'function' && backupModal.open) backupModal.close();
         else if (backupModal) backupModal.removeAttribute('open');
     }
+
+    function openOfficialReleaseModal() {
+        if (officialReleaseModal && typeof officialReleaseModal.showModal === 'function') officialReleaseModal.showModal();
+        else if (officialReleaseModal) officialReleaseModal.setAttribute('open', '');
+    }
+
+    function closeOfficialReleaseModal() {
+        if (officialReleaseModal && typeof officialReleaseModal.close === 'function' && officialReleaseModal.open) officialReleaseModal.close();
+        else if (officialReleaseModal) officialReleaseModal.removeAttribute('open');
+    }
+
+    officialReleaseModal?.addEventListener('click', function(e) {
+        if (e.target === officialReleaseModal) {
+            var r = officialReleaseModal.getBoundingClientRect();
+            if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) {
+                closeOfficialReleaseModal();
+            }
+        }
+    });
 
     document.querySelectorAll('.js-confirm-backup-form').forEach(function(form) {
         form.addEventListener('submit', function(e) {

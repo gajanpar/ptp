@@ -108,6 +108,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Cadangan Basis Data & Pemulihan (Disaster Recovery)
     Route::get('/system/backup', [BackupController::class, 'index'])->name('backup.index');
     Route::post('/system/backup', [BackupController::class, 'store'])->name('backup.store');
+    Route::post('/system/backup/official-release', [BackupController::class, 'officialRelease'])->name('backup.official-release');
     Route::get('/system/backup/download/{filename}', [BackupController::class, 'download'])->name('backup.download');
     Route::delete('/system/backup/{filename}', [BackupController::class, 'destroy'])->name('backup.destroy');
 
